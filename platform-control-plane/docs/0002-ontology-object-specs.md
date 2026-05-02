@@ -382,7 +382,19 @@ INDEX idx_to     _to_id     TYPE bloom_filter   GRANULARITY 4
 These indexes are cheap to write and turn the "Entities in this bbox in the
 last 5 min" demo query from a full scan into a partition-skipping scan.
 
-### 9.3 Enum representation
+### 9.3 Position storage (v1)
+
+ClickHouse does **not** support `Nullable(Tuple(...))`. Where the spec
+shows a `position` field, the physical column is two `Float64` (or
+`Nullable(Float64)`) columns named `lat` and `lon`. The Go layer wraps these
+into a `Position{Lat, Lon}` value at the API boundary so consumers (LLM,
+UI, services) see the logical `position` shape from the spec. Skip indexes
+attach to the individual columns.
+
+`Array(Tuple(Float64, Float64))` (waypoints, polygon target_area) is
+supported by CH and stays as-is.
+
+### 9.4 Enum representation
 
 All `_subtype`, `status`, `severity`, `kind`, `priority`, `classification`,
 `threat_level`, `command_type` columns are `LowCardinality(String)`. **Not**

@@ -14,6 +14,7 @@ import (
 	"github.com/nsh-2026/platform-control-plane/internal/clickhouse"
 	"github.com/nsh-2026/platform-control-plane/internal/config"
 	"github.com/nsh-2026/platform-control-plane/internal/health"
+	"github.com/nsh-2026/platform-control-plane/internal/ontology"
 	"github.com/nsh-2026/platform-control-plane/internal/server"
 )
 
@@ -55,6 +56,10 @@ func run() error {
 			log.Error("error closing clickhouse", zap.Error(err))
 		}
 	}()
+
+	if err := ontology.Migrate(ctx, chConn.Pool(), log.Named("ontology")); err != nil {
+		return fmt.Errorf("ontology migrate: %w", err)
+	}
 
 	healthHandler := health.New(chConn, log.Named("health"))
 	router := server.NewRouter(healthHandler, log)
