@@ -1,10 +1,12 @@
 'use client';
 
+import type React from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Activity,
   Bot,
-  ChevronRight,
   CheckCircle2,
+  ChevronRight,
   Cpu,
   Crosshair,
   Database,
@@ -29,8 +31,6 @@ import {
   WifiOff,
   Zap,
 } from 'lucide-react';
-import type React from 'react';
-import { useEffect, useMemo, useState } from 'react';
 
 type Position = {
   lat: number;
@@ -140,7 +140,13 @@ const INITIAL_SNAPSHOT: MissionSnapshot = {
       autonomy_mode: 'hold for approval',
       speed_kts: 72,
       heading: 88,
-      position: { lat: 38.724, lon: 23.515, grid: '35S-QR-381', x: 570, y: 340 },
+      position: {
+        lat: 38.724,
+        lon: 23.515,
+        grid: '35S-QR-381',
+        x: 570,
+        y: 340,
+      },
     },
     {
       id: 'rook-2',
@@ -154,7 +160,13 @@ const INITIAL_SNAPSHOT: MissionSnapshot = {
       autonomy_mode: 'supervised',
       speed_kts: 88,
       heading: 215,
-      position: { lat: 38.691, lon: 23.463, grid: '35S-QR-369', x: 420, y: 480 },
+      position: {
+        lat: 38.691,
+        lon: 23.463,
+        grid: '35S-QR-369',
+        x: 420,
+        y: 480,
+      },
     },
     {
       id: 'rook-3',
@@ -168,7 +180,13 @@ const INITIAL_SNAPSHOT: MissionSnapshot = {
       autonomy_mode: 'standby',
       speed_kts: 0,
       heading: 0,
-      position: { lat: 38.705, lon: 23.492, grid: '35S-QR-372', x: 500, y: 420 },
+      position: {
+        lat: 38.705,
+        lon: 23.492,
+        grid: '35S-QR-372',
+        x: 500,
+        y: 420,
+      },
     },
   ],
   events: [
@@ -254,7 +272,11 @@ const INITIAL_SNAPSHOT: MissionSnapshot = {
     signal: 'Intermittent burst',
     confidence: 0.82,
     classification: 'Unidentified emitter',
-    overlays: ['RF bearing 071', 'EO confidence degraded', 'Radio report nearby'],
+    overlays: [
+      'RF bearing 071',
+      'EO confidence degraded',
+      'Radio report nearby',
+    ],
   },
   copilot_answer: {
     question: 'Why are you recommending ROOK-1?',
@@ -337,7 +359,9 @@ const EDGE_KIT = [
 export default function Page() {
   const [snapshot, setSnapshot] = useState<MissionSnapshot>(INITIAL_SNAPSHOT);
   const [apiStatus, setApiStatus] = useState<'local' | 'synced'>('local');
-  const [selectedQuestion, setSelectedQuestion] = useState(COPILOT_QUESTIONS[0]);
+  const [selectedQuestion, setSelectedQuestion] = useState(
+    COPILOT_QUESTIONS[0]
+  );
 
   useEffect(() => {
     void fetch(`${API_BASE}/api/v1/mission/snapshot`)
@@ -520,9 +544,9 @@ function MissionTimeline({ snapshot }: { snapshot: MissionSnapshot }) {
               >
                 <div className="flex items-center gap-1.5">
                   {complete ? (
-                    <CheckCircle2 className="size-3 shrink-0 text-success" />
+                    <CheckCircle2 className="text-success size-3 shrink-0" />
                   ) : active ? (
-                    <Activity className="size-3 shrink-0 text-primary" />
+                    <Activity className="text-primary size-3 shrink-0" />
                   ) : (
                     <span className="bg-border block size-2 shrink-0 rounded-full" />
                   )}
@@ -608,7 +632,13 @@ function HeaderBar({
           tone={snapshot.local_queue_count > 0 ? 'amber' : 'ok'}
         />
         <StatusPill
-          icon={degraded ? <WifiOff className="size-3" /> : <Wifi className="size-3" />}
+          icon={
+            degraded ? (
+              <WifiOff className="size-3" />
+            ) : (
+              <Wifi className="size-3" />
+            )
+          }
           label="Edge"
           value={degraded ? 'Local' : 'Synced'}
           tone={degraded ? 'amber' : 'ok'}
@@ -723,7 +753,9 @@ function EdgeKitPanel({ snapshot }: { snapshot: MissionSnapshot }) {
     <div className="surface-card-elevated border-border absolute left-6 top-[154px] w-[292px] rounded-md border p-3.5">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <div className="label-cap text-muted-foreground">Backpack edge kit</div>
+          <div className="label-cap text-muted-foreground">
+            Backpack edge kit
+          </div>
           <div className="text-foreground mt-0.5 font-serif text-[17px] italic">
             Cloud optional C2 stack
           </div>
@@ -731,10 +763,16 @@ function EdgeKitPanel({ snapshot }: { snapshot: MissionSnapshot }) {
         <div
           className={[
             'grid size-8 place-items-center rounded-sm',
-            degraded ? 'bg-warning text-warning-foreground' : 'bg-success text-success-foreground',
+            degraded
+              ? 'bg-warning text-warning-foreground'
+              : 'bg-success text-success-foreground',
           ].join(' ')}
         >
-          {degraded ? <WifiOff className="size-4" /> : <Wifi className="size-4" />}
+          {degraded ? (
+            <WifiOff className="size-4" />
+          ) : (
+            <Wifi className="size-4" />
+          )}
         </div>
       </div>
 
@@ -762,7 +800,9 @@ function EdgeKitPanel({ snapshot }: { snapshot: MissionSnapshot }) {
 
       <div className="border-border/60 mt-3 border-t pt-2">
         <div className="flex items-center justify-between">
-          <span className="label-cap text-muted-foreground">Operating mode</span>
+          <span className="label-cap text-muted-foreground">
+            Operating mode
+          </span>
           <span className="text-foreground font-mono text-[10px]">
             {degraded ? 'local autonomy' : 'cloud synced'}
           </span>
@@ -778,7 +818,9 @@ function OodaRail({ snapshot }: { snapshot: MissionSnapshot }) {
       <div className="mb-2 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Zap className="text-primary size-4" />
-          <div className="label-cap text-muted-foreground">OODA compression</div>
+          <div className="label-cap text-muted-foreground">
+            OODA compression
+          </div>
         </div>
         <span className="text-foreground font-mono text-[10px]">
           step {snapshot.scenario_step}/6
@@ -800,7 +842,9 @@ function OodaRail({ snapshot }: { snapshot: MissionSnapshot }) {
               <div className="text-foreground font-mono text-[13px]">
                 {step.value}
               </div>
-              <div className="label-cap text-muted-foreground">{step.label}</div>
+              <div className="label-cap text-muted-foreground">
+                {step.label}
+              </div>
               <div className="text-muted-foreground mt-1 line-clamp-2 text-[10px] leading-tight">
                 {step.detail}
               </div>
@@ -880,18 +924,18 @@ function SensorPreview({ feed }: { feed: SensorFeed }) {
         </div>
       </div>
 
-      <div className="relative mt-3 h-[132px] overflow-hidden rounded border border-border bg-[hsl(222_32%_5%)]">
+      <div className="border-border relative mt-3 h-[132px] overflow-hidden rounded border bg-[hsl(222_32%_5%)]">
         <div className="absolute inset-0 opacity-80 [background:repeating-linear-gradient(0deg,hsl(150_35%_56%/0.10)_0,hsl(150_35%_56%/0.10)_1px,transparent_1px,transparent_7px),radial-gradient(circle_at_62%_46%,hsl(28_75%_60%/0.42),transparent_18%),radial-gradient(circle_at_48%_58%,hsl(200_55%_65%/0.28),transparent_22%),linear-gradient(135deg,hsl(222_35%_6%),hsl(222_30%_12%))]" />
-        <div className="absolute inset-x-0 top-1/2 h-px bg-friendly/70" />
-        <div className="absolute inset-y-0 left-1/2 w-px bg-friendly/70" />
-        <div className="absolute left-[58%] top-[38%] size-12 rounded-full border border-primary/80 bg-primary/10" />
-        <div className="absolute left-3 top-3 font-mono text-[10px] text-friendly">
+        <div className="bg-friendly/70 absolute inset-x-0 top-1/2 h-px" />
+        <div className="bg-friendly/70 absolute inset-y-0 left-1/2 w-px" />
+        <div className="border-primary/80 bg-primary/10 absolute left-[58%] top-[38%] size-12 rounded-full border" />
+        <div className="text-friendly absolute left-3 top-3 font-mono text-[10px]">
           {feed.signal}
         </div>
-        <div className="absolute bottom-3 left-3 right-3 font-mono text-[10px] text-muted-foreground">
+        <div className="text-muted-foreground absolute inset-x-3 bottom-3 font-mono text-[10px]">
           {feed.title}
         </div>
-        <ScanLine className="absolute right-3 top-3 size-4 text-primary" />
+        <ScanLine className="text-primary absolute right-3 top-3 size-4" />
       </div>
 
       <div className="mt-3">
@@ -900,7 +944,7 @@ function SensorPreview({ feed }: { feed: SensorFeed }) {
           {feed.overlays.map((overlay) => (
             <span
               key={overlay}
-              className="border-border bg-muted rounded-sm border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+              className="border-border bg-muted text-muted-foreground rounded-sm border px-1.5 py-0.5 font-mono text-[10px]"
             >
               {overlay}
             </span>
@@ -1000,14 +1044,32 @@ function TacticalMap({ snapshot }: { snapshot: MissionSnapshot }) {
           <line key={`major-h-${y}`} x1="0" y1={y} x2="1000" y2={y} />
         ))}
       </g>
-      <g fontFamily="var(--font-mono)" fontSize="9" fill="hsl(38 18% 60% / 0.72)">
-        <text x="618" y="292">35S-QR-417</text>
-        <text x="250" y="488">CONVOY ROUTE</text>
-        <text x="555" y="403">RELAY BOX</text>
+      <g
+        fontFamily="var(--font-mono)"
+        fontSize="9"
+        fill="hsl(38 18% 60% / 0.72)"
+      >
+        <text x="618" y="292">
+          35S-QR-417
+        </text>
+        <text x="250" y="488">
+          CONVOY ROUTE
+        </text>
+        <text x="555" y="403">
+          RELAY BOX
+        </text>
       </g>
-      <g fontFamily="var(--font-serif)" fontStyle="italic" fill="hsl(38 25% 75% / 0.55)">
-        <text x="190" y="180" fontSize="14">Limnos</text>
-        <text x="380" y="600" fontSize="13">Aegean Sea</text>
+      <g
+        fontFamily="var(--font-serif)"
+        fontStyle="italic"
+        fill="hsl(38 25% 75% / 0.55)"
+      >
+        <text x="190" y="180" fontSize="14">
+          Limnos
+        </text>
+        <text x="380" y="600" fontSize="13">
+          Aegean Sea
+        </text>
       </g>
 
       <path
@@ -1030,7 +1092,13 @@ function TacticalMap({ snapshot }: { snapshot: MissionSnapshot }) {
         strokeWidth="1.6"
         strokeDasharray="4 5"
       />
-      <text x="315" y="520" fontFamily="var(--font-mono)" fontSize="10" fill="hsl(35 88% 75%)">
+      <text
+        x="315"
+        y="520"
+        fontFamily="var(--font-mono)"
+        fontSize="10"
+        fill="hsl(35 88% 75%)"
+      >
         CONVOY AXIS
       </text>
 
@@ -1042,11 +1110,29 @@ function TacticalMap({ snapshot }: { snapshot: MissionSnapshot }) {
           stroke="hsl(12 78% 60% / 0.7)"
         />
         <circle r="18" fill="hsl(12 78% 60% / 0.14)" stroke="hsl(12 78% 60%)" />
-        <Crosshair x="-8" y="-8" width="16" height="16" stroke="hsl(12 78% 70%)" />
-        <text x="25" y="-8" fontFamily="var(--font-mono)" fontSize="11" fill="hsl(12 78% 70%)">
+        <Crosshair
+          x="-8"
+          y="-8"
+          width="16"
+          height="16"
+          stroke="hsl(12 78% 70%)"
+        />
+        <text
+          x="25"
+          y="-8"
+          fontFamily="var(--font-mono)"
+          fontSize="11"
+          fill="hsl(12 78% 70%)"
+        >
           RF-417
         </text>
-        <text x="25" y="6" fontFamily="var(--font-mono)" fontSize="9" fill="hsl(38 18% 65%)">
+        <text
+          x="25"
+          y="6"
+          fontFamily="var(--font-mono)"
+          fontSize="9"
+          fill="hsl(38 18% 65%)"
+        >
           35S-QR-417
         </text>
       </g>
@@ -1062,11 +1148,29 @@ function TacticalMap({ snapshot }: { snapshot: MissionSnapshot }) {
             fill="hsl(222 30% 9% / 0.92)"
             stroke="hsl(35 88% 62% / 0.55)"
           />
-          <Satellite x="-72" y="-8" width="16" height="16" stroke="hsl(35 88% 62%)" />
-          <text x="-48" y="-2" fontFamily="var(--font-mono)" fontSize="10" fill="hsl(35 88% 75%)">
+          <Satellite
+            x="-72"
+            y="-8"
+            width="16"
+            height="16"
+            stroke="hsl(35 88% 62%)"
+          />
+          <text
+            x="-48"
+            y="-2"
+            fontFamily="var(--font-mono)"
+            fontSize="10"
+            fill="hsl(35 88% 75%)"
+          >
             CLOUD LINK DENIED
           </text>
-          <text x="-48" y="13" fontFamily="var(--font-mono)" fontSize="9" fill="hsl(38 18% 65%)">
+          <text
+            x="-48"
+            y="13"
+            fontFamily="var(--font-mono)"
+            fontSize="9"
+            fill="hsl(38 18% 65%)"
+          >
             EDGE QUEUE ACTIVE
           </text>
         </g>
@@ -1090,7 +1194,11 @@ function TacticalMap({ snapshot }: { snapshot: MissionSnapshot }) {
           <circle
             r="10"
             fill="hsl(222 32% 7%)"
-            stroke={drone.status === 'charging' ? 'hsl(35 88% 62%)' : 'hsl(200 50% 68%)'}
+            stroke={
+              drone.status === 'charging'
+                ? 'hsl(35 88% 62%)'
+                : 'hsl(200 50% 68%)'
+            }
             strokeWidth="1.5"
           />
           <polygon points="0,-14 5,-6 -5,-6" fill="hsl(200 50% 68%)" />
@@ -1119,13 +1227,32 @@ function TacticalMap({ snapshot }: { snapshot: MissionSnapshot }) {
       ))}
 
       <g transform="translate(355 510)">
-        <rect x="-8" y="-8" width="16" height="16" fill="hsl(222 32% 7%)" stroke="hsl(35 88% 62%)" />
-        <text x="15" y="4" fontFamily="var(--font-mono)" fontSize="10" fill="hsl(35 88% 75%)">
+        <rect
+          x="-8"
+          y="-8"
+          width="16"
+          height="16"
+          fill="hsl(222 32% 7%)"
+          stroke="hsl(35 88% 62%)"
+        />
+        <text
+          x="15"
+          y="4"
+          fontFamily="var(--font-mono)"
+          fontSize="10"
+          fill="hsl(35 88% 75%)"
+        >
           BRAVO-3
         </text>
       </g>
       <g transform="translate(650 315)">
-        <MapPin x="-8" y="-44" width="16" height="16" stroke="hsl(28 75% 60%)" />
+        <MapPin
+          x="-8"
+          y="-44"
+          width="16"
+          height="16"
+          stroke="hsl(28 75% 60%)"
+        />
       </g>
     </svg>
   );
@@ -1266,7 +1393,7 @@ function CopilotPanel({
           </button>
         ))}
       </div>
-      <div className="surface-card mt-3 rounded-md border border-border p-3">
+      <div className="surface-card border-border mt-3 rounded-md border p-3">
         <div className="label-cap text-muted-foreground">{answer.question}</div>
         <p className="text-foreground/90 mt-2 text-[13px] leading-relaxed">
           {answer.answer}
@@ -1275,7 +1402,7 @@ function CopilotPanel({
           {answer.citations.map((citation) => (
             <span
               key={citation}
-              className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+              className="bg-muted text-muted-foreground rounded-sm px-1.5 py-0.5 font-mono text-[10px]"
             >
               {citation}
             </span>
@@ -1401,7 +1528,7 @@ function Recommendations({
           return (
             <li
               key={rec.id}
-              className="surface-card hairline group hover:border-primary/60 mb-2 rounded-md border p-3.5 transition-colors last:mb-0"
+              className="surface-card hairline hover:border-primary/60 group mb-2 rounded-md border p-3.5 transition-colors last:mb-0"
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
@@ -1429,7 +1556,10 @@ function Recommendations({
 
               <div className="mt-3 grid gap-1.5">
                 {rec.why.map((why) => (
-                  <div key={why} className="flex items-center gap-2 text-[12px]">
+                  <div
+                    key={why}
+                    className="flex items-center gap-2 text-[12px]"
+                  >
                     <span className="bg-primary size-1.5 rounded-full" />
                     <span className="text-foreground/80">{why}</span>
                   </div>
@@ -1449,7 +1579,9 @@ function Recommendations({
                 </div>
                 <button
                   type="button"
-                  disabled={rec.status === 'approved' || rec.status === 'queued'}
+                  disabled={
+                    rec.status === 'approved' || rec.status === 'queued'
+                  }
                   onClick={() => onApprove(rec)}
                   className="bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground inline-flex items-center gap-1 rounded-sm px-3 py-1 text-[12px] font-medium transition-colors"
                 >
@@ -1490,7 +1622,7 @@ function VoiceAffordance() {
     <div className="pointer-events-none fixed bottom-7 right-7 z-50 flex flex-col items-end gap-2">
       <div className="bg-background/85 hairline rounded-full border px-3 py-1.5 backdrop-blur-md">
         <span className="text-muted-foreground font-mono text-[10px]">
-          Voice: "task ROOK-1 to investigate"
+          Voice: task ROOK-1 to investigate
         </span>
       </div>
       <button
@@ -1568,13 +1700,20 @@ function applyCommand(
       signal: 'RF source localized',
       confidence: 0.89,
       classification: 'Probable handheld emitter',
-      overlays: ['Heat trace in terrain shadow', 'RF bearing stable', 'Human approval logged'],
+      overlays: [
+        'Heat trace in terrain shadow',
+        'RF bearing stable',
+        'Human approval logged',
+      ],
     },
     events,
   };
 }
 
-function applyComms(snapshot: MissionSnapshot, degraded: boolean): MissionSnapshot {
+function applyComms(
+  snapshot: MissionSnapshot,
+  degraded: boolean
+): MissionSnapshot {
   const event: MissionEvent = degraded
     ? {
         id: 'local-comms-denied',
@@ -1602,7 +1741,9 @@ function applyComms(snapshot: MissionSnapshot, degraded: boolean): MissionSnapsh
     edge_mode: degraded ? 'degraded' : 'synced',
     cloud_link: degraded ? 'denied' : 'healthy',
     comms_latency_ms: degraded ? 0 : 92,
-    scenario_step: degraded ? Math.max(snapshot.scenario_step, 5) : snapshot.scenario_step,
+    scenario_step: degraded
+      ? Math.max(snapshot.scenario_step, 5)
+      : snapshot.scenario_step,
     scenario_label: degraded ? 'Cloud denied' : 'Reconnected',
     local_queue_count: degraded ? Math.max(snapshot.local_queue_count, 1) : 0,
     commander_line: degraded
@@ -1611,7 +1752,9 @@ function applyComms(snapshot: MissionSnapshot, degraded: boolean): MissionSnapsh
     events: [
       event,
       ...snapshot.events.filter(
-        (existing) => existing.id !== 'local-comms-denied' && existing.id !== 'local-comms-restored'
+        (existing) =>
+          existing.id !== 'local-comms-denied' &&
+          existing.id !== 'local-comms-restored'
       ),
     ],
   };
@@ -1644,7 +1787,11 @@ function advanceLocal(snapshot: MissionSnapshot): MissionSnapshot {
         signal: 'Intermittent burst',
         confidence: 0.82,
         classification: 'Unidentified emitter',
-        overlays: ['RF bearing 071', 'EO confidence degraded', 'Radio report nearby'],
+        overlays: [
+          'RF bearing 071',
+          'EO confidence degraded',
+          'Radio report nearby',
+        ],
       },
     };
   }
@@ -1654,7 +1801,8 @@ function advanceLocal(snapshot: MissionSnapshot): MissionSnapshot {
       ...snapshot,
       scenario_step: 2,
       scenario_label: 'Corroborated',
-      commander_line: 'Radio, RF, and EO uncertainty converge on the same grid.',
+      commander_line:
+        'Radio, RF, and EO uncertainty converge on the same grid.',
       events: prependUnique(
         prependUnique(snapshot.events, {
           id: 'evt-radio-grid',
@@ -1685,16 +1833,23 @@ function advanceLocal(snapshot: MissionSnapshot): MissionSnapshot {
       ...snapshot,
       scenario_step: 3,
       scenario_label: 'Recommended',
-      commander_line: 'The hybrid AI layer proposes a supervised drone task with cited evidence.',
+      commander_line:
+        'The hybrid AI layer proposes a supervised drone task with cited evidence.',
       recommendations: INITIAL_SNAPSHOT.recommendations,
       copilot_answer: answerForQuestion('Why are you recommending ROOK-1?'),
     };
   }
 
   if (next === 4) {
-    const rec = snapshot.recommendations[0] ?? INITIAL_SNAPSHOT.recommendations[0];
+    const rec =
+      snapshot.recommendations[0] ?? INITIAL_SNAPSHOT.recommendations[0];
     return applyCommand(
-      { ...snapshot, recommendations: snapshot.recommendations.length ? snapshot.recommendations : INITIAL_SNAPSHOT.recommendations },
+      {
+        ...snapshot,
+        recommendations: snapshot.recommendations.length
+          ? snapshot.recommendations
+          : INITIAL_SNAPSHOT.recommendations,
+      },
       rec
     );
   }
