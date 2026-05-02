@@ -126,7 +126,7 @@ const INITIAL_SNAPSHOT: MissionSnapshot = {
   comms_latency_ms: 92,
   local_queue_count: 0,
   commander_line:
-    'We compress the OODA loop by turning sensor overload into human-approved autonomous drone tasking.',
+    'Edge signals are fused into supervised autonomous tasking with evidence, audit, and local continuity.',
   drones: [
     {
       id: 'rook-1',
@@ -340,11 +340,42 @@ const SCENARIO_BEATS = [
   'Edge continues',
 ];
 
+const PRODUCT_STAGES = [
+  {
+    label: '1. Operational picture',
+    value: 'live dashboard',
+    detail: 'units, assets, alerts, task state',
+  },
+  {
+    label: '2. Data integration sim',
+    value: '5 feeds',
+    detail: 'drone, RF, radio, satellite, positions',
+  },
+  {
+    label: '3. Fleet management sim',
+    value: '3 UAV',
+    detail: 'tasking, relay, readiness, local queue',
+  },
+  {
+    label: '4. Autonomous command',
+    value: 'draft + approve',
+    detail: 'intent to supervised action',
+  },
+];
+
 const OODA_STEPS = [
   { label: 'Observe', value: '4 feeds', detail: 'RF + EO + radio + telemetry' },
   { label: 'Orient', value: '0.82', detail: 'fused emitter confidence' },
   { label: 'Decide', value: '1 rec', detail: 'grounded with citations' },
   { label: 'Act', value: '<4m', detail: 'ROOK-1 tasking ETA' },
+];
+
+const DATA_SOURCES = [
+  { label: 'Drone EO/IR', value: 'ROOK-1', tone: 'friendly' },
+  { label: 'RF bearing', value: '071 deg', tone: 'threat' },
+  { label: 'Radio report', value: 'BRAVO-3', tone: 'amber' },
+  { label: 'Satellite pass', value: 'T+06m', tone: 'muted' },
+  { label: 'Unit position', value: 'live', tone: 'friendly' },
 ];
 
 const EDGE_KIT = [
@@ -487,18 +518,19 @@ export default function Page() {
         onResetScenario={resetScenario}
         onToggleComms={toggleComms}
       />
+      <ProductStageRail snapshot={snapshot} />
       <MissionTimeline snapshot={snapshot} />
-      <main className="bg-border grid flex-1 grid-cols-12 gap-px overflow-hidden">
-        <section className="invert-surface col-span-12 overflow-hidden lg:col-span-8">
+      <main className="bg-border grid flex-1 grid-cols-12 gap-px overflow-y-auto lg:overflow-hidden">
+        <section className="invert-surface col-span-12 min-h-[560px] overflow-hidden lg:col-span-8 lg:min-h-0">
           <MapPane
             snapshot={snapshot}
             selectedDrone={selectedDrone}
             sensorFeed={snapshot.sensor_feed}
           />
         </section>
-        <aside className="bg-background col-span-12 flex flex-col overflow-hidden lg:col-span-4">
+        <aside className="bg-background col-span-12 flex min-h-[620px] flex-col overflow-hidden lg:col-span-4 lg:min-h-0">
           <ChangeFeed events={snapshot.events} />
-          <CopilotPanel
+          <AutonomousCommandPanel
             answer={snapshot.copilot_answer}
             selectedQuestion={selectedQuestion}
             onAsk={askCopilot}
@@ -516,14 +548,61 @@ export default function Page() {
   );
 }
 
+function ProductStageRail({ snapshot }: { snapshot: MissionSnapshot }) {
+  return (
+    <div className="border-border/60 bg-background relative z-10 border-b px-5 py-3">
+      <div className="flex gap-2 overflow-x-auto pb-1 xl:grid xl:grid-cols-4 xl:overflow-visible xl:pb-0">
+        {PRODUCT_STAGES.map((stage, index) => {
+          const active =
+            index === 0 ||
+            (index === 1 && snapshot.scenario_step >= 1) ||
+            (index === 2 && snapshot.scenario_step >= 3) ||
+            (index === 3 && snapshot.scenario_step >= 4);
+          return (
+            <div
+              key={stage.label}
+              className={[
+                'min-w-[170px] rounded-md border px-3 py-2 xl:min-w-0',
+                active
+                  ? 'border-primary/45 bg-accent text-accent-foreground'
+                  : 'border-border bg-card text-muted-foreground',
+              ].join(' ')}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate font-mono text-[11px]">
+                  {stage.label}
+                </span>
+                <span
+                  className={[
+                    'size-1.5 shrink-0 rounded-full',
+                    active ? 'bg-primary' : 'bg-border',
+                  ].join(' ')}
+                />
+              </div>
+              <div className="text-foreground mt-1 truncate font-serif text-[15px] italic">
+                {stage.value}
+              </div>
+              <div className="text-muted-foreground mt-0.5 truncate text-[11px]">
+                {stage.detail}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function MissionTimeline({ snapshot }: { snapshot: MissionSnapshot }) {
   return (
     <div className="border-border/60 bg-background relative z-10 border-b px-5 py-2.5">
       <div className="flex items-center gap-3">
         <div className="hidden min-w-[180px] lg:block">
-          <div className="label-cap text-muted-foreground">Demo spine</div>
+          <div className="label-cap text-muted-foreground">
+            Operational sequence
+          </div>
           <div className="text-foreground font-serif text-[15px] italic">
-            Centralized command. Decentralized execution.
+            Detect, fuse, task, verify, continue locally.
           </div>
         </div>
         <div className="grid min-w-0 flex-1 grid-cols-7 gap-1.5">
@@ -559,7 +638,7 @@ function MissionTimeline({ snapshot }: { snapshot: MissionSnapshot }) {
           })}
         </div>
         <div className="hidden min-w-[150px] text-right xl:block">
-          <div className="label-cap text-muted-foreground">OODA target</div>
+          <div className="label-cap text-muted-foreground">Tasking target</div>
           <div className="text-foreground font-mono text-[12px]">
             detect to task &lt; 60s
           </div>
@@ -585,8 +664,8 @@ function HeaderBar({
   const degraded = snapshot.edge_mode === 'degraded';
 
   return (
-    <header className="border-border/60 bg-background relative z-10 flex h-[76px] shrink-0 items-stretch border-b">
-      <div className="border-border/60 flex w-[260px] items-center gap-3 border-r px-5">
+    <header className="border-border/60 bg-background relative z-10 flex h-[76px] shrink-0 items-stretch overflow-hidden border-b">
+      <div className="border-border/60 flex w-[172px] shrink-0 items-center gap-3 border-r px-4 lg:w-[260px] lg:px-5">
         <div
           aria-hidden
           className="bg-primary text-primary-foreground grid size-8 place-items-center rounded-sm"
@@ -603,7 +682,7 @@ function HeaderBar({
         </div>
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col justify-center px-8">
+      <div className="hidden min-w-0 flex-1 flex-col justify-center px-8 md:flex">
         <div className="flex items-baseline gap-5">
           <span className="label-cap text-muted-foreground/80">Operation</span>
           <h1 className="text-foreground font-serif text-[26px] italic leading-none tracking-tight">
@@ -618,7 +697,7 @@ function HeaderBar({
         </p>
       </div>
 
-      <div className="flex items-center gap-3 px-5">
+      <div className="ml-auto flex items-center gap-2 px-3 xl:gap-3 xl:px-5">
         <StatusPill
           icon={<Play className="size-3" />}
           label="Beat"
@@ -660,7 +739,7 @@ function HeaderBar({
           className="border-border bg-card hover:bg-muted flex h-10 items-center gap-2 rounded-md border px-3 text-[12px] transition-colors"
         >
           <Play className="size-3.5" />
-          Advance
+          Run step
         </button>
         <button
           type="button"
@@ -701,7 +780,7 @@ function StatusPill({
         ? 'bg-warning'
         : 'bg-threat';
   return (
-    <div className="hairline flex items-center gap-2 rounded-sm border border-transparent bg-transparent px-2 py-1.5">
+    <div className="hairline hidden items-center gap-2 rounded-sm border border-transparent bg-transparent px-2 py-1.5 xl:flex">
       <span className={`size-1.5 rounded-full ${dot}`} aria-hidden />
       {icon ? <span className="text-muted-foreground">{icon}</span> : null}
       <span className="label-cap text-muted-foreground">{label}</span>
@@ -731,12 +810,15 @@ function MapPane({
       <EdgeKitPanel snapshot={snapshot} />
       <OodaRail snapshot={snapshot} />
       <div className="bg-card border-border absolute right-6 top-6 rounded-md border px-3.5 py-2.5 shadow-[0_2px_8px_-4px_hsl(0_0%_0%/0.5)]">
-        <div className="label-cap text-muted-foreground">Commander Query</div>
+        <div className="label-cap text-muted-foreground">
+          Autonomous command workspace
+        </div>
         <div className="text-foreground/95 mt-1 max-w-[260px] text-[12px] leading-snug">
-          Why retask ROOK-1? RF, radio, and video-gap evidence converge at
-          35S-QR-417.
+          Convert commander intent into a supervised drone task, then inspect
+          evidence before approval.
         </div>
       </div>
+      <DataIntegrationPanel />
       <div className="absolute bottom-6 left-6">
         <AssetRail drones={snapshot.drones} />
       </div>
@@ -750,14 +832,14 @@ function EdgeKitPanel({ snapshot }: { snapshot: MissionSnapshot }) {
   const degraded = snapshot.edge_mode === 'degraded';
 
   return (
-    <div className="surface-card-elevated border-border absolute left-6 top-[154px] w-[292px] rounded-md border p-3.5">
+    <div className="surface-card-elevated border-border absolute left-6 top-[154px] hidden w-[292px] rounded-md border p-3.5 xl:block">
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="label-cap text-muted-foreground">
-            Backpack edge kit
+            Edge execution node
           </div>
           <div className="text-foreground mt-0.5 font-serif text-[17px] italic">
-            Cloud optional C2 stack
+            Deployed autonomous systems stack
           </div>
         </div>
         <div
@@ -814,7 +896,7 @@ function EdgeKitPanel({ snapshot }: { snapshot: MissionSnapshot }) {
 
 function OodaRail({ snapshot }: { snapshot: MissionSnapshot }) {
   return (
-    <div className="surface-card-elevated border-border absolute left-1/2 top-6 w-[390px] -translate-x-1/2 rounded-md border p-3">
+    <div className="surface-card-elevated border-border absolute left-1/2 top-6 hidden w-[390px] -translate-x-1/2 rounded-md border p-3 xl:block">
       <div className="mb-2 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Zap className="text-primary size-4" />
@@ -856,6 +938,55 @@ function OodaRail({ snapshot }: { snapshot: MissionSnapshot }) {
   );
 }
 
+function DataIntegrationPanel() {
+  return (
+    <div className="surface-card-elevated border-border absolute right-6 top-[112px] hidden w-[300px] rounded-md border p-3.5 xl:block">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Layers className="text-primary size-4" />
+          <div>
+            <div className="label-cap text-muted-foreground">
+              Data integration simulation
+            </div>
+            <div className="text-foreground font-mono text-[11px]">
+              fused into typed mission objects
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="grid gap-1.5">
+        {DATA_SOURCES.map((source) => (
+          <div
+            key={source.label}
+            className="border-border bg-background/65 flex items-center justify-between gap-2 rounded-sm border px-2 py-1.5"
+          >
+            <div className="flex min-w-0 items-center gap-2">
+              <span
+                className={[
+                  'size-1.5 shrink-0 rounded-full',
+                  source.tone === 'friendly'
+                    ? 'bg-friendly'
+                    : source.tone === 'threat'
+                      ? 'bg-threat'
+                      : source.tone === 'amber'
+                        ? 'bg-warning'
+                        : 'bg-muted-foreground/50',
+                ].join(' ')}
+              />
+              <span className="text-muted-foreground truncate font-mono text-[10px]">
+                {source.label}
+              </span>
+            </div>
+            <span className="text-foreground shrink-0 font-mono text-[10px]">
+              {source.value}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function LayerChip({
   label,
   tone,
@@ -888,27 +1019,46 @@ function LayerChip({
 
 function AssetRail({ drones }: { drones: DroneAsset[] }) {
   return (
-    <div className="bg-card border-border flex gap-2 rounded-md border p-2 shadow-[0_2px_8px_-4px_hsl(0_0%_0%/0.5)]">
-      {drones.map((drone) => (
-        <div key={drone.id} className="min-w-[112px] px-2 py-1">
-          <div className="flex items-center gap-1.5">
-            <Plane className="text-friendly size-3.5" />
-            <span className="text-foreground font-mono text-[11px]">
-              {drone.name}
-            </span>
-          </div>
-          <div className="text-muted-foreground mt-1 font-mono text-[10px]">
-            {drone.battery}% - {drone.status}
-          </div>
+    <div className="bg-card border-border max-w-[calc(100vw-3rem)] overflow-x-auto rounded-md border p-2 shadow-[0_2px_8px_-4px_hsl(0_0%_0%/0.5)]">
+      <div className="mb-1.5 flex items-center justify-between gap-3 px-1">
+        <div className="label-cap text-muted-foreground">
+          Fleet management simulation
         </div>
-      ))}
+        <div className="text-foreground font-mono text-[10px]">
+          {drones.length} assets
+        </div>
+      </div>
+      <div className="flex gap-2">
+        {drones.map((drone) => (
+          <div
+            key={drone.id}
+            className="border-border/70 min-w-[132px] rounded-sm border px-2 py-1.5"
+          >
+            <div className="flex items-center gap-1.5">
+              <Plane className="text-friendly size-3.5" />
+              <span className="text-foreground font-mono text-[11px]">
+                {drone.name}
+              </span>
+            </div>
+            <div className="text-muted-foreground mt-1 truncate font-mono text-[10px]">
+              {drone.status} - {drone.autonomy_mode}
+            </div>
+            <div className="bg-border mt-2 h-1 overflow-hidden rounded-full">
+              <div
+                className="bg-friendly h-full rounded-full"
+                style={{ width: `${drone.battery}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
 function SensorPreview({ feed }: { feed: SensorFeed }) {
   return (
-    <div className="surface-card-elevated border-border absolute bottom-6 right-[370px] w-[300px] rounded-md border p-3.5">
+    <div className="surface-card-elevated border-border absolute bottom-32 left-6 w-[300px] rounded-md border p-3.5 xl:bottom-6 xl:left-auto xl:right-[370px]">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Video className="text-friendly size-4" />
@@ -957,7 +1107,7 @@ function SensorPreview({ feed }: { feed: SensorFeed }) {
 
 function SelectedDroneCard({ drone }: { drone: DroneAsset }) {
   return (
-    <div className="surface-card-elevated border-border absolute bottom-6 right-6 w-[336px] rounded-md border p-4">
+    <div className="surface-card-elevated border-border absolute bottom-6 right-6 hidden w-[336px] rounded-md border p-4 xl:block">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="label-cap text-friendly">Selected Drone</div>
@@ -1356,7 +1506,7 @@ function FilterChip({ label, active }: { label: string; active?: boolean }) {
   );
 }
 
-function CopilotPanel({
+function AutonomousCommandPanel({
   answer,
   selectedQuestion,
   onAsk,
@@ -1371,10 +1521,10 @@ function CopilotPanel({
         <div className="flex items-center gap-2">
           <Bot className="text-primary size-4" />
           <h2 className="text-foreground font-serif text-[18px] italic tracking-tight">
-            Commander copilot
+            Autonomous command workspace
           </h2>
         </div>
-        <span className="label-cap text-muted-foreground">Grounded</span>
+        <span className="label-cap text-muted-foreground">Typed evidence</span>
       </div>
       <div className="grid grid-cols-2 gap-1.5">
         {COPILOT_QUESTIONS.map((question) => (
@@ -1511,7 +1661,7 @@ function Recommendations({
       <div className="border-border/60 flex items-baseline justify-between border-b px-6 py-3">
         <div className="flex items-baseline gap-3">
           <h2 className="text-foreground font-serif text-[18px] italic tracking-tight">
-            Human-approved tasks
+            Fleet tasking queue
           </h2>
           <span className="label-cap text-muted-foreground">
             Hybrid AI layer
@@ -1748,7 +1898,7 @@ function applyComms(
     local_queue_count: degraded ? Math.max(snapshot.local_queue_count, 1) : 0,
     commander_line: degraded
       ? 'Cloud denied. Edge node continues local fusion, recommendations, and drone tasking.'
-      : 'Centralized command, decentralized execution.',
+      : 'Cloud bridge restored. Edge audit queue synchronized with the control plane.',
     events: [
       event,
       ...snapshot.events.filter(
