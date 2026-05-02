@@ -4,12 +4,10 @@ import { PropsWithChildren } from 'react';
 import { Toaster } from 'sonner';
 
 import { Metadata } from '@/app/manifest';
-import { AppSidebar } from '@/components/_layout/app-sidebar';
 import { ThemeProvider } from '@/components/_layout/theme-provider';
 import { fonts } from '@/components/lib/fonts';
 import { cn } from '@/components/lib/utils';
 import Providers from '@/components/providers/query-provider';
-import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
 export const metadata = Metadata;
@@ -18,17 +16,12 @@ export const dynamic = 'force-dynamic';
 export default function RootLayout({ children }: PropsWithChildren) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={cn('min-h-screen font-sans', fonts)}>
+      <body className={cn('h-screen overflow-hidden font-sans', fonts)}>
         <ThemeProvider attribute="class">
           <Providers>
             <TooltipProvider delayDuration={200}>
               <Toaster />
-              <SidebarProvider defaultOpen={false}>
-                <AppSidebar />
-                <SidebarInset>
-                  <div className="flex h-full flex-col">{children}</div>
-                </SidebarInset>
-              </SidebarProvider>
+              {children}
             </TooltipProvider>
           </Providers>
         </ThemeProvider>
