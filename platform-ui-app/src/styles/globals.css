@@ -3,143 +3,104 @@
 @tailwind utilities;
 
 /*
- * Design tokens — Linear-inspired light theme, indigo accent.
+ * Mission Commander — editorial daylight theme.
  *
- * Discipline:
- *   - Single brand hue (indigo 246°) + neutral zinc grays.
- *     No drive-by blue/green/orange in UI chrome.
- *   - Semantic colors reserved for status (red destructive,
- *     amber warning, green ok). Never decorative.
- *   - Borders are 1px, low contrast — readable surface separation
- *     without visual noise.
- *   - Surfaces favor subtle gradient washes over flat fills, the
- *     Linear-style "card with light from above" feel.
+ * Warm cream paper, deep ink, one amber accent. Tactical surfaces
+ * (the operational map, selected-entity dossier) are sealed-off
+ * dark blocks via .invert-surface so glyphs and tracks pop.
+ * Newspaper-morning-briefing energy with a battle map at the center.
  */
 
 @layer base {
   :root {
-    /* — Surface scale ——————————————————————————————————— */
-    --background: 0 0% 100%;             /* page — pure white */
-    --foreground: 240 10% 8%;            /* primary text */
-    --card: 0 0% 100%;                   /* card base */
-    --card-foreground: 240 10% 8%;
+    /* — Surface scale (light, warm) ——————————————————————— */
+    --background: 36 28% 97%;
+    --foreground: 222 26% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 26% 12%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 8%;
+    --popover-foreground: 222 26% 12%;
 
-    /* — Brand: indigo ——————————————————————————————————— */
-    /* Tailwind indigo-600 */
-    --primary: 244 76% 60%;
-    --primary-foreground: 0 0% 100%;
-
-    /* Gradient endpoints for hero / hover states */
-    --brand-from: 246 83% 60%;           /* indigo-500 */
-    --brand-to: 270 91% 65%;             /* violet-500 */
+    /* — Brand accent: warm amber (rare, semantic) ——————— */
+    --primary: 24 78% 48%;
+    --primary-foreground: 36 28% 98%;
+    --brand-from: 24 80% 50%;
+    --brand-to: 14 75% 48%;
 
     /* — Neutrals ——————————————————————————————————————— */
-    --secondary: 240 5% 96%;             /* zinc-100 */
-    --secondary-foreground: 240 6% 20%;
+    --secondary: 36 20% 93%;
+    --secondary-foreground: 222 22% 18%;
+    --muted: 36 18% 94%;
+    --muted-foreground: 222 10% 42%;
+    --accent: 24 70% 95%;
+    --accent-foreground: 24 80% 32%;
 
-    --muted: 240 5% 96%;
-    --muted-foreground: 240 4% 46%;      /* zinc-500 */
-
-    --accent: 244 80% 96%;               /* very pale indigo */
-    --accent-foreground: 244 70% 35%;    /* indigo-700 */
-
-    /* — Status ————————————————————————————————————————— */
-    --destructive: 0 72% 50%;            /* red-600 */
+    /* — Status — combat / mission semantics ————————————— */
+    --destructive: 8 78% 48%;
     --destructive-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;               /* amber-500 */
-    --warning-foreground: 30 80% 18%;
-    --success: 142 71% 38%;              /* emerald-600 */
+    --threat: 8 78% 48%;
+    --threat-foreground: 0 0% 100%;
+    --friendly: 210 65% 38%;
+    --friendly-foreground: 0 0% 100%;
+    --warning: 32 92% 46%;
+    --warning-foreground: 0 0% 100%;
+    --success: 152 50% 32%;
     --success-foreground: 0 0% 100%;
 
     /* — Edges ——————————————————————————————————————————— */
-    --border: 240 6% 90%;                /* zinc-200 */
-    --input: 240 6% 90%;
-    --ring: 244 76% 60%;
+    --border: 222 12% 88%;
+    --input: 222 12% 88%;
+    --ring: 24 78% 48%;
 
     /* — Geometry ———————————————————————————————————————— */
-    --radius: 0.625rem;                  /* slightly more than shadcn default */
+    --radius: 0.375rem;
 
-    /* — Sidebar — distinct surface, very subtle ————————— */
-    --sidebar-background: 240 5% 98%;
-    --sidebar-foreground: 240 6% 20%;
-    --sidebar-primary: 244 76% 60%;
+    /* — Sidebar — slightly cooler/darker than canvas ————— */
+    --sidebar-background: 36 22% 95%;
+    --sidebar-foreground: 222 18% 28%;
+    --sidebar-primary: 24 78% 48%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 244 80% 96%;
-    --sidebar-accent-foreground: 244 70% 35%;
-    --sidebar-border: 240 6% 92%;
-    --sidebar-ring: 244 76% 60%;
+    --sidebar-accent: 36 20% 92%;
+    --sidebar-accent-foreground: 222 26% 12%;
+    --sidebar-border: 222 12% 88%;
+    --sidebar-ring: 24 78% 48%;
 
-    /* — Chart palette — restrained, single-hue ranges ———— */
-    --chart-red-600: 0 72% 50%;
-    --chart-red-500: 0 78% 60%;
-    --chart-orange-600: 25 95% 53%;
-    --chart-orange-500: 25 95% 53%;
-    --chart-yellow-600: 45 93% 47%;
-    --chart-green-600: 142 71% 38%;
-    --chart-blue-600: 244 76% 60%;
-    --chart-indigo-600: 244 76% 60%;
-    --chart-purple-600: 270 91% 65%;
-    --chart-gray-600: 240 4% 46%;
-    --chart-primary: 244 76% 60%;
+    /* — Topographic line tint — works on light shell ——— */
+    --topo-ink: 222 30% 18%;
+    --topo-alpha: 0.05;
   }
 
-  .dark {
-    /* Light is primary today; dark mode tokens are a starting
-     * point that will be tightened in a follow-up pass. */
-    --background: 240 10% 4%;
-    --foreground: 240 5% 96%;
-    --card: 240 10% 6%;
-    --card-foreground: 240 5% 96%;
-    --popover: 240 10% 6%;
-    --popover-foreground: 240 5% 96%;
+  /* Inverted surfaces — dark blocks scoped within the light shell.
+   * Wrap any container in <div class="invert-surface"> and every
+   * Tailwind utility that reads from the design tokens (bg-card,
+   * text-foreground, border-border, bg-muted, etc.) automatically
+   * uses the dark palette for everything inside. */
+  .invert-surface {
+    --background: 222 35% 6%;
+    --foreground: 38 28% 92%;
+    --card: 222 30% 9%;
+    --card-foreground: 38 28% 92%;
+    --popover: 222 32% 8%;
+    --popover-foreground: 38 28% 92%;
+    --secondary: 222 22% 13%;
+    --secondary-foreground: 38 20% 88%;
+    --muted: 222 20% 12%;
+    --muted-foreground: 38 12% 62%;
+    --accent: 24 50% 16%;
+    --accent-foreground: 24 78% 75%;
+    --border: 222 18% 18%;
+    --input: 222 18% 18%;
+    --primary: 28 75% 60%;
+    --primary-foreground: 222 40% 8%;
+    --threat: 12 78% 60%;
+    --friendly: 200 55% 65%;
+    --warning: 35 88% 62%;
+    --success: 150 35% 56%;
+    --topo-ink: 38 25% 70%;
+    --topo-alpha: 0.04;
 
-    --primary: 244 76% 65%;
-    --primary-foreground: 0 0% 100%;
-    --brand-from: 246 83% 65%;
-    --brand-to: 270 91% 70%;
-
-    --secondary: 240 6% 12%;
-    --secondary-foreground: 240 5% 96%;
-
-    --muted: 240 6% 12%;
-    --muted-foreground: 240 5% 60%;
-
-    --accent: 244 50% 18%;
-    --accent-foreground: 244 80% 80%;
-
-    --destructive: 0 62% 50%;
-    --destructive-foreground: 0 0% 100%;
-    --warning: 38 90% 55%;
-    --warning-foreground: 30 80% 12%;
-    --success: 142 71% 45%;
-    --success-foreground: 0 0% 100%;
-
-    --border: 240 6% 16%;
-    --input: 240 6% 16%;
-    --ring: 244 76% 65%;
-
-    --sidebar-background: 240 10% 6%;
-    --sidebar-foreground: 240 5% 90%;
-    --sidebar-primary: 244 76% 65%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 6% 12%;
-    --sidebar-accent-foreground: 244 80% 80%;
-    --sidebar-border: 240 6% 16%;
-    --sidebar-ring: 244 76% 65%;
-
-    --chart-red-600: 0 78% 60%;
-    --chart-red-500: 0 78% 60%;
-    --chart-orange-600: 25 95% 60%;
-    --chart-orange-500: 25 95% 60%;
-    --chart-yellow-600: 45 93% 55%;
-    --chart-green-600: 142 71% 50%;
-    --chart-blue-600: 244 76% 65%;
-    --chart-indigo-600: 244 76% 65%;
-    --chart-purple-600: 270 91% 70%;
-    --chart-gray-600: 240 5% 60%;
-    --chart-primary: 244 76% 65%;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
   }
 }
 
@@ -149,71 +110,50 @@
   }
   html, body {
     @apply bg-background text-foreground antialiased;
-    /* Inter stylistic alternates: cv11 = single-story `a`,
-     * ss01 = open digits. Both improve readability in dense
-     * tables. Other Inter `cv` features we tried (cv02, cv03,
-     * cv04) were a wash — left them off. */
-    font-feature-settings: 'cv11', 'ss01';
+    font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: 'ss01', 'cv11';
   }
-  /* Numerics: tabular by default — cleaner alignment in tables and
-   * detail cards without per-element class application. */
   .tabular,
   table,
   .font-mono {
     font-variant-numeric: tabular-nums;
   }
-  /* Remove default browser bolding noise; we control weight via
-   * font-medium / font-semibold explicitly. */
-  h1, h2, h3, h4, h5, h6, strong, b {
-    font-weight: 600;
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-serif), 'Iowan Old Style', 'Georgia', serif;
+    font-weight: 500;
+  }
+  /* Whisper-thin paper grain across the whole canvas. Subtler than
+   * the dark theme had it — light backgrounds need less. */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.04;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
   }
 }
 
 @layer utilities {
-  /* — Premium card surface ————————————————————————————————
-   * A near-white card with a subtle top-down gradient — the
-   * "soft light from above" finish. Use as a className modifier
-   * on any container that wants to read as elevated. */
+  /* — Card surfaces — shadow-only so they work in both light shell
+   *   and inverted (dark) blocks. */
   .surface-card {
-    background:
-      linear-gradient(
-        180deg,
-        hsl(var(--card)) 0%,
-        hsl(240 10% 99%) 100%
-      );
+    background-color: hsl(var(--card));
+    box-shadow:
+      inset 0 1px 0 0 hsl(var(--foreground) / 0.04),
+      0 1px 2px -1px hsl(0 0% 0% / 0.06);
   }
   .surface-card-elevated {
-    background:
-      linear-gradient(
-        180deg,
-        hsl(var(--card)) 0%,
-        hsl(240 10% 98%) 100%
-      );
+    background-color: hsl(var(--card));
     box-shadow:
-      0 1px 0 0 hsl(240 8% 95%) inset,
-      0 1px 2px -1px hsl(240 10% 70% / 0.08);
-  }
-  .dark .surface-card {
-    background:
-      linear-gradient(
-        180deg,
-        hsl(var(--card)) 0%,
-        hsl(240 10% 7%) 100%
-      );
-  }
-  .dark .surface-card-elevated {
-    background:
-      linear-gradient(
-        180deg,
-        hsl(240 10% 8%) 0%,
-        hsl(240 10% 5%) 100%
-      );
-    box-shadow:
-      0 1px 0 0 hsl(240 6% 18%) inset,
-      0 1px 2px -1px hsl(0 0% 0% / 0.5);
+      inset 0 1px 0 0 hsl(var(--foreground) / 0.06),
+      0 6px 16px -6px hsl(0 0% 0% / 0.18),
+      0 1px 2px -1px hsl(0 0% 0% / 0.10);
   }
 
-  /* — Brand gradient text + surface ——————————————————————— */
+  /* — Brand gradient text + surface — for hero numerals only. */
   .brand-gradient-text {
     background: linear-gradient(
       135deg,
@@ -224,20 +164,77 @@
     background-clip: text;
     color: transparent;
   }
-  .brand-gradient-bg {
-    background: linear-gradient(
-      135deg,
-      hsl(var(--brand-from)) 0%,
-      hsl(var(--brand-to)) 100%
-    );
+
+  .hairline {
+    border-color: hsl(var(--border));
   }
 
-  /* Hairline divider — softer than border-border for inline
-   * separators inside cards. */
-  .hairline {
-    border-color: hsl(240 6% 94%);
+  /* — Topographic cross-hatch — line color and opacity inherit
+   *   from --topo-ink / --topo-alpha so it works on both shells. */
+  .topo {
+    background-image:
+      repeating-linear-gradient(
+        37deg,
+        transparent 0,
+        transparent 26px,
+        hsl(var(--topo-ink) / var(--topo-alpha)) 26px,
+        hsl(var(--topo-ink) / var(--topo-alpha)) 27px
+      ),
+      repeating-linear-gradient(
+        -53deg,
+        transparent 0,
+        transparent 41px,
+        hsl(var(--topo-ink) / calc(var(--topo-alpha) * 0.7)) 41px,
+        hsl(var(--topo-ink) / calc(var(--topo-alpha) * 0.7)) 42px
+      );
   }
-  .dark .hairline {
-    border-color: hsl(240 6% 14%);
+
+  /* — Pulsing target ring — used on the selected hostile entity. */
+  @keyframes pulse-ring {
+    0%   { transform: scale(0.85); opacity: 0.85; }
+    70%  { transform: scale(1.6);  opacity: 0;    }
+    100% { transform: scale(1.6);  opacity: 0;    }
+  }
+  .pulse-ring {
+    animation: pulse-ring 2.4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+    transform-origin: center;
+  }
+
+  /* — Voice mic — soft outer breath. */
+  @keyframes mic-breath {
+    0%, 100% {
+      box-shadow:
+        0 0 0 0 hsl(24 78% 48% / 0.5),
+        0 12px 28px -10px hsl(0 0% 0% / 0.30);
+    }
+    50% {
+      box-shadow:
+        0 0 0 14px hsl(24 78% 48% / 0),
+        0 12px 28px -10px hsl(0 0% 0% / 0.30);
+    }
+  }
+  .mic-breath { animation: mic-breath 2.6s ease-in-out infinite; }
+
+  /* — Feed entry — slides up + brightens, then settles. */
+  @keyframes feed-enter {
+    0%   { opacity: 0; transform: translateY(6px); }
+    50%  { opacity: 1; }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  .feed-enter { animation: feed-enter 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+  /* — Live blip — slow horizontal shimmer on the active sensor. */
+  @keyframes blip {
+    0%, 100% { opacity: 0.55; }
+    50%      { opacity: 1; }
+  }
+  .blip { animation: blip 2.2s ease-in-out infinite; }
+
+  /* — Editorial small-uppercase tracked label. */
+  .label-cap {
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 600;
   }
 }

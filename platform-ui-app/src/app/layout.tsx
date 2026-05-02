@@ -6,7 +6,6 @@ import { Toaster } from 'sonner';
 import { Metadata } from '@/app/manifest';
 import { AppSidebar } from '@/components/_layout/app-sidebar';
 import { ThemeProvider } from '@/components/_layout/theme-provider';
-import { ThemeSwitcher } from '@/components/_layout/theme-switcher';
 import { fonts } from '@/components/lib/fonts';
 import { cn } from '@/components/lib/utils';
 import Providers from '@/components/providers/query-provider';
@@ -24,15 +23,12 @@ export default function RootLayout({ children }: PropsWithChildren) {
           <Providers>
             <TooltipProvider delayDuration={200}>
               <Toaster />
-              <SidebarProvider>
+              <SidebarProvider defaultOpen={false}>
                 <AppSidebar />
                 <SidebarInset>
                   <div className="flex h-full flex-col">{children}</div>
                 </SidebarInset>
               </SidebarProvider>
-              <div className="fixed bottom-6 right-6 z-[100] flex gap-2">
-                <ThemeSwitcher />
-              </div>
             </TooltipProvider>
           </Providers>
         </ThemeProvider>
