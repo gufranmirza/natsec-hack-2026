@@ -1,22 +1,33 @@
 'use client';
 
 import {
+  Activity,
   Bot,
   ChevronRight,
+  CheckCircle2,
+  Cpu,
   Crosshair,
+  Database,
+  GitBranch,
+  Layers,
   MapPin,
   Mic,
+  Network,
   Plane,
   Play,
   Radio,
   RotateCcw,
   Satellite,
   ScanLine,
+  Server,
   ShieldCheck,
+  Smartphone,
   Square,
+  Timer,
   Video,
   Wifi,
   WifiOff,
+  Zap,
 } from 'lucide-react';
 import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
@@ -297,6 +308,32 @@ const COPILOT_QUESTIONS = [
   'What happens if cloud comms drop?',
 ];
 
+const SCENARIO_BEATS = [
+  'Calm',
+  'RF anomaly',
+  'Corroborated',
+  'Recommended',
+  'Approved',
+  'Cloud denied',
+  'Edge continues',
+];
+
+const OODA_STEPS = [
+  { label: 'Observe', value: '4 feeds', detail: 'RF + EO + radio + telemetry' },
+  { label: 'Orient', value: '0.82', detail: 'fused emitter confidence' },
+  { label: 'Decide', value: '1 rec', detail: 'grounded with citations' },
+  { label: 'Act', value: '<4m', detail: 'ROOK-1 tasking ETA' },
+];
+
+const EDGE_KIT = [
+  { label: 'Operator UI', value: 'phone/laptop', icon: Smartphone },
+  { label: 'Local control plane', value: 'single node', icon: Server },
+  { label: 'Ontology mirror', value: 'typed objects', icon: Database },
+  { label: 'Reasoning layer', value: 'rules + local model', icon: Cpu },
+  { label: 'Drone link', value: 'supervised autonomy', icon: Network },
+  { label: 'Sync queue', value: 'replay on restore', icon: GitBranch },
+];
+
 export default function Page() {
   const [snapshot, setSnapshot] = useState<MissionSnapshot>(INITIAL_SNAPSHOT);
   const [apiStatus, setApiStatus] = useState<'local' | 'synced'>('local');
@@ -426,6 +463,7 @@ export default function Page() {
         onResetScenario={resetScenario}
         onToggleComms={toggleComms}
       />
+      <MissionTimeline snapshot={snapshot} />
       <main className="bg-border grid flex-1 grid-cols-12 gap-px overflow-hidden">
         <section className="invert-surface col-span-12 overflow-hidden lg:col-span-8">
           <MapPane
@@ -441,6 +479,7 @@ export default function Page() {
             selectedQuestion={selectedQuestion}
             onAsk={askCopilot}
           />
+          <AutonomyEnvelope snapshot={snapshot} />
           <Recommendations
             recommendations={snapshot.recommendations}
             drones={snapshot.drones}
@@ -449,6 +488,59 @@ export default function Page() {
         </aside>
       </main>
       <VoiceAffordance />
+    </div>
+  );
+}
+
+function MissionTimeline({ snapshot }: { snapshot: MissionSnapshot }) {
+  return (
+    <div className="border-border/60 bg-background relative z-10 border-b px-5 py-2.5">
+      <div className="flex items-center gap-3">
+        <div className="hidden min-w-[180px] lg:block">
+          <div className="label-cap text-muted-foreground">Demo spine</div>
+          <div className="text-foreground font-serif text-[15px] italic">
+            Centralized command. Decentralized execution.
+          </div>
+        </div>
+        <div className="grid min-w-0 flex-1 grid-cols-7 gap-1.5">
+          {SCENARIO_BEATS.map((beat, index) => {
+            const active = snapshot.scenario_step === index;
+            const complete = snapshot.scenario_step > index;
+            return (
+              <div
+                key={beat}
+                className={[
+                  'relative min-w-0 rounded-sm border px-2 py-1.5',
+                  active
+                    ? 'border-primary bg-accent text-accent-foreground'
+                    : complete
+                      ? 'border-success/40 bg-success/5 text-foreground'
+                      : 'border-border bg-card text-muted-foreground',
+                ].join(' ')}
+              >
+                <div className="flex items-center gap-1.5">
+                  {complete ? (
+                    <CheckCircle2 className="size-3 shrink-0 text-success" />
+                  ) : active ? (
+                    <Activity className="size-3 shrink-0 text-primary" />
+                  ) : (
+                    <span className="bg-border block size-2 shrink-0 rounded-full" />
+                  )}
+                  <span className="truncate font-mono text-[10px]">
+                    {index}. {beat}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="hidden min-w-[150px] text-right xl:block">
+          <div className="label-cap text-muted-foreground">OODA target</div>
+          <div className="text-foreground font-mono text-[12px]">
+            detect to task &lt; 60s
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -606,6 +698,8 @@ function MapPane({
         <LayerChip label="Friendly units" tone="amber" active />
         <LayerChip label="Edge execution" tone="muted" active />
       </div>
+      <EdgeKitPanel snapshot={snapshot} />
+      <OodaRail snapshot={snapshot} />
       <div className="bg-card border-border absolute right-6 top-6 rounded-md border px-3.5 py-2.5 shadow-[0_2px_8px_-4px_hsl(0_0%_0%/0.5)]">
         <div className="label-cap text-muted-foreground">Commander Query</div>
         <div className="text-foreground/95 mt-1 max-w-[260px] text-[12px] leading-snug">
@@ -618,6 +712,102 @@ function MapPane({
       </div>
       <SensorPreview feed={sensorFeed} />
       {selectedDrone ? <SelectedDroneCard drone={selectedDrone} /> : null}
+    </div>
+  );
+}
+
+function EdgeKitPanel({ snapshot }: { snapshot: MissionSnapshot }) {
+  const degraded = snapshot.edge_mode === 'degraded';
+
+  return (
+    <div className="surface-card-elevated border-border absolute left-6 top-[154px] w-[292px] rounded-md border p-3.5">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="label-cap text-muted-foreground">Backpack edge kit</div>
+          <div className="text-foreground mt-0.5 font-serif text-[17px] italic">
+            Cloud optional C2 stack
+          </div>
+        </div>
+        <div
+          className={[
+            'grid size-8 place-items-center rounded-sm',
+            degraded ? 'bg-warning text-warning-foreground' : 'bg-success text-success-foreground',
+          ].join(' ')}
+        >
+          {degraded ? <WifiOff className="size-4" /> : <Wifi className="size-4" />}
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-1.5">
+        {EDGE_KIT.map((item) => {
+          const Icon = item.icon;
+          return (
+            <div
+              key={item.label}
+              className="border-border bg-background/65 rounded-sm border px-2 py-1.5"
+            >
+              <div className="flex items-center gap-1.5">
+                <Icon className="text-primary size-3" />
+                <span className="text-foreground font-mono text-[10px]">
+                  {item.label}
+                </span>
+              </div>
+              <div className="text-muted-foreground mt-0.5 truncate font-mono text-[9px]">
+                {item.value}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="border-border/60 mt-3 border-t pt-2">
+        <div className="flex items-center justify-between">
+          <span className="label-cap text-muted-foreground">Operating mode</span>
+          <span className="text-foreground font-mono text-[10px]">
+            {degraded ? 'local autonomy' : 'cloud synced'}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OodaRail({ snapshot }: { snapshot: MissionSnapshot }) {
+  return (
+    <div className="surface-card-elevated border-border absolute left-1/2 top-6 w-[390px] -translate-x-1/2 rounded-md border p-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Zap className="text-primary size-4" />
+          <div className="label-cap text-muted-foreground">OODA compression</div>
+        </div>
+        <span className="text-foreground font-mono text-[10px]">
+          step {snapshot.scenario_step}/6
+        </span>
+      </div>
+      <div className="grid grid-cols-4 gap-1.5">
+        {OODA_STEPS.map((step, index) => {
+          const active = snapshot.scenario_step >= Math.min(index + 1, 4);
+          return (
+            <div
+              key={step.label}
+              className={[
+                'rounded-sm border px-2 py-1.5',
+                active
+                  ? 'border-primary/45 bg-primary/10'
+                  : 'border-border bg-background/55',
+              ].join(' ')}
+            >
+              <div className="text-foreground font-mono text-[13px]">
+                {step.value}
+              </div>
+              <div className="label-cap text-muted-foreground">{step.label}</div>
+              <div className="text-muted-foreground mt-1 line-clamp-2 text-[10px] leading-tight">
+                {step.detail}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1096,6 +1286,85 @@ function CopilotPanel({
   );
 }
 
+function AutonomyEnvelope({ snapshot }: { snapshot: MissionSnapshot }) {
+  const degraded = snapshot.edge_mode === 'degraded';
+  const approved = snapshot.recommendations.some(
+    (rec) => rec.status === 'approved' || rec.status === 'queued'
+  );
+
+  const controls = [
+    {
+      label: 'Human gate',
+      value: approved ? 'approved' : 'required',
+      tone: approved ? 'ok' : 'amber',
+      icon: ShieldCheck,
+    },
+    {
+      label: 'Rules of tasking',
+      value: 'ISR only',
+      tone: 'ok',
+      icon: Layers,
+    },
+    {
+      label: 'Local queue',
+      value: degraded ? `${snapshot.local_queue_count} pending` : 'clear',
+      tone: degraded ? 'amber' : 'ok',
+      icon: GitBranch,
+    },
+    {
+      label: 'Sync window',
+      value: degraded ? 'on restore' : 'live',
+      tone: degraded ? 'amber' : 'ok',
+      icon: Timer,
+    },
+  ];
+
+  return (
+    <div className="border-border/60 shrink-0 border-b px-6 py-3">
+      <div className="mb-2 flex items-baseline justify-between">
+        <h2 className="text-foreground font-serif text-[17px] italic tracking-tight">
+          Autonomy envelope
+        </h2>
+        <span className="label-cap text-muted-foreground">Human in loop</span>
+      </div>
+      <div className="grid grid-cols-2 gap-1.5">
+        {controls.map((control) => {
+          const Icon = control.icon;
+          return (
+            <div
+              key={control.label}
+              className="border-border bg-card rounded-sm border px-2.5 py-2"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <Icon
+                    className={[
+                      'size-3.5 shrink-0',
+                      control.tone === 'ok' ? 'text-success' : 'text-warning',
+                    ].join(' ')}
+                  />
+                  <span className="text-muted-foreground truncate font-mono text-[10px]">
+                    {control.label}
+                  </span>
+                </div>
+                <span
+                  className={[
+                    'size-1.5 shrink-0 rounded-full',
+                    control.tone === 'ok' ? 'bg-success' : 'bg-warning',
+                  ].join(' ')}
+                />
+              </div>
+              <div className="text-foreground mt-1 font-mono text-[11px]">
+                {control.value}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function Recommendations({
   recommendations,
   drones,
@@ -1111,7 +1380,7 @@ function Recommendations({
   );
 
   return (
-    <div className="flex min-h-0 shrink-0 flex-col">
+    <div className="flex min-h-[220px] flex-1 flex-col overflow-hidden">
       <div className="border-border/60 flex items-baseline justify-between border-b px-6 py-3">
         <div className="flex items-baseline gap-3">
           <h2 className="text-foreground font-serif text-[18px] italic tracking-tight">
@@ -1126,7 +1395,7 @@ function Recommendations({
         </span>
       </div>
 
-      <ul className="p-3">
+      <ul className="min-h-0 flex-1 overflow-y-auto p-3">
         {recommendations.map((rec) => {
           const drone = droneByID.get(rec.asset_id);
           return (
