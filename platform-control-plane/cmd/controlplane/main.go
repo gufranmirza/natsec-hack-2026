@@ -13,6 +13,7 @@ import (
 
 	"github.com/nsh-2026/platform-control-plane/internal/clickhouse"
 	"github.com/nsh-2026/platform-control-plane/internal/config"
+	"github.com/nsh-2026/platform-control-plane/internal/devices"
 	"github.com/nsh-2026/platform-control-plane/internal/health"
 	"github.com/nsh-2026/platform-control-plane/internal/ontology"
 	"github.com/nsh-2026/platform-control-plane/internal/server"
@@ -62,7 +63,8 @@ func run() error {
 	}
 
 	healthHandler := health.New(chConn, log.Named("health"))
-	router := server.NewRouter(healthHandler, log)
+	deviceHandler := devices.New(log.Named("devices"))
+	router := server.NewRouter(healthHandler, deviceHandler, log)
 	srv := server.New(cfg.Server, router, log.Named("server"))
 	srv.Start()
 
