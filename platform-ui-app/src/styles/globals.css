@@ -3,12 +3,20 @@
 @tailwind utilities;
 
 /*
- * Mission Commander — editorial daylight theme.
+ * Mission Commander — editorial tactical theme (foundation pass v2).
  *
- * Warm cream paper, deep ink, one amber accent. Tactical surfaces
- * (the operational map, selected-entity dossier) are sealed-off
- * dark blocks via .invert-surface so glyphs and tracks pop.
- * Newspaper-morning-briefing energy with a battle map at the center.
+ * Design discipline:
+ *   - Sharp corners. Operator station, not consumer SaaS. --radius is 0.
+ *     Brand mark and primary CTA opt back in to soft corners explicitly.
+ *   - Hairline frames over drop shadows. Cards = color shift +
+ *     1px border. No box-shadow elevation; depth comes from value.
+ *   - Single warm-amber accent. Used ruthlessly for "AI / focusable now."
+ *     Semantic colors (threat/friendly/warning/success) reserved for
+ *     mission status, never for UI affordance.
+ *   - Tactical surfaces (the operational map, selected-entity dossier)
+ *     are sealed-off dark blocks via .invert-surface so glyphs and
+ *     tracks pop. Light shell elsewhere — newspaper-morning energy
+ *     with a battle map at the center.
  */
 
 @layer base {
@@ -48,12 +56,12 @@
     --success-foreground: 0 0% 100%;
 
     /* — Edges ——————————————————————————————————————————— */
-    --border: 222 12% 88%;
-    --input: 222 12% 88%;
+    --border: 222 12% 86%;
+    --input: 222 12% 86%;
     --ring: 24 78% 48%;
 
-    /* — Geometry ———————————————————————————————————————— */
-    --radius: 0.375rem;
+    /* — Geometry: SHARP. No rounded corners on operational chrome. */
+    --radius: 0px;
 
     /* — Sidebar — slightly cooler/darker than canvas ————— */
     --sidebar-background: 36 22% 95%;
@@ -62,12 +70,12 @@
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 36 20% 92%;
     --sidebar-accent-foreground: 222 26% 12%;
-    --sidebar-border: 222 12% 88%;
+    --sidebar-border: 222 12% 86%;
     --sidebar-ring: 24 78% 48%;
 
     /* — Topographic line tint — works on light shell ——— */
     --topo-ink: 222 30% 18%;
-    --topo-alpha: 0.05;
+    --topo-alpha: 0.04;
   }
 
   /* Inverted surfaces — dark blocks scoped within the light shell.
@@ -122,8 +130,7 @@
     font-family: var(--font-serif), 'Iowan Old Style', 'Georgia', serif;
     font-weight: 500;
   }
-  /* Whisper-thin paper grain across the whole canvas. Subtler than
-   * the dark theme had it — light backgrounds need less. */
+  /* Whisper-thin paper grain across the whole canvas. */
   body::before {
     content: '';
     position: fixed;
@@ -137,23 +144,21 @@
 }
 
 @layer utilities {
-  /* — Card surfaces — shadow-only so they work in both light shell
-   *   and inverted (dark) blocks. */
+  /* — Card surfaces — flat color + hairline. NO box-shadow.
+   *   Depth comes from value (one shade lighter than canvas + a
+   *   1px border). The .surface-card-elevated variant adds a 2px
+   *   primary-color top stripe — a defense-console trope. */
   .surface-card {
     background-color: hsl(var(--card));
-    box-shadow:
-      inset 0 1px 0 0 hsl(var(--foreground) / 0.04),
-      0 1px 2px -1px hsl(0 0% 0% / 0.06);
+    border: 1px solid hsl(var(--border));
   }
   .surface-card-elevated {
     background-color: hsl(var(--card));
-    box-shadow:
-      inset 0 1px 0 0 hsl(var(--foreground) / 0.06),
-      0 6px 16px -6px hsl(0 0% 0% / 0.18),
-      0 1px 2px -1px hsl(0 0% 0% / 0.10);
+    border: 1px solid hsl(var(--border));
+    box-shadow: inset 0 2px 0 0 hsl(var(--primary) / 0.85);
   }
 
-  /* — Brand gradient text + surface — for hero numerals only. */
+  /* — Brand gradient text — for hero numerals only, used very rarely. */
   .brand-gradient-text {
     background: linear-gradient(
       135deg,
@@ -169,8 +174,8 @@
     border-color: hsl(var(--border));
   }
 
-  /* — Topographic cross-hatch — line color and opacity inherit
-   *   from --topo-ink / --topo-alpha so it works on both shells. */
+  /* — Topographic cross-hatch — line color/opacity inherit from
+   *   --topo-ink / --topo-alpha so it works on both shells. */
   .topo {
     background-image:
       repeating-linear-gradient(
@@ -189,7 +194,72 @@
       );
   }
 
-  /* — Pulsing target ring — used on the selected hostile entity. */
+  /* — CRT scanlines — faint horizontal interlace. Used on tactical
+   *   surfaces to evoke a HUD/console without being literal. Inherits
+   *   the foreground color so it works on both shells. */
+  .scanline {
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 2px,
+      hsl(var(--foreground) / 0.025) 2px,
+      hsl(var(--foreground) / 0.025) 3px
+    );
+  }
+
+  /* — Targeting cursor — applied to the operational map area.
+   *   Native crosshair is enough; signals "this is a sighted surface." */
+  .cursor-target { cursor: crosshair; }
+
+  /* — Corner-bracket reticles — universal "selected / focusable / target"
+   *   affordance. Wrap a positioned container with .brackets and the
+   *   four corners gain a 6px L-shape in primary color. Use sparingly:
+   *   one bracket-frame per surface that needs to read as "active." */
+  .brackets {
+    position: relative;
+  }
+  .brackets::before,
+  .brackets::after {
+    content: '';
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    pointer-events: none;
+    border-color: hsl(var(--primary));
+  }
+  .brackets::before {
+    top: -1px;
+    left: -1px;
+    border-top: 1.5px solid;
+    border-left: 1.5px solid;
+  }
+  .brackets::after {
+    bottom: -1px;
+    right: -1px;
+    border-bottom: 1.5px solid;
+    border-right: 1.5px solid;
+  }
+  /* Four-corner variant — adds the other diagonal pair. */
+  .brackets-4 {
+    position: relative;
+  }
+  .brackets-4::before,
+  .brackets-4::after,
+  .brackets-4 > .br-tr,
+  .brackets-4 > .br-bl {
+    content: '';
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    pointer-events: none;
+    border-color: hsl(var(--primary));
+  }
+  .brackets-4::before { top: -1px; left: -1px; border-top: 1.5px solid; border-left: 1.5px solid; }
+  .brackets-4::after  { bottom: -1px; right: -1px; border-bottom: 1.5px solid; border-right: 1.5px solid; }
+  .brackets-4 > .br-tr { top: -1px; right: -1px; border-top: 1.5px solid; border-right: 1.5px solid; }
+  .brackets-4 > .br-bl { bottom: -1px; left: -1px; border-bottom: 1.5px solid; border-left: 1.5px solid; }
+
+  /* — Pulsing target ring — used on selected hostile entity. */
   @keyframes pulse-ring {
     0%   { transform: scale(0.85); opacity: 0.85; }
     70%  { transform: scale(1.6);  opacity: 0;    }
@@ -200,22 +270,18 @@
     transform-origin: center;
   }
 
-  /* — Voice mic — soft outer breath. */
+  /* — Mic breath — soft outer pulse on voice button. */
   @keyframes mic-breath {
     0%, 100% {
-      box-shadow:
-        0 0 0 0 hsl(24 78% 48% / 0.5),
-        0 12px 28px -10px hsl(0 0% 0% / 0.30);
+      box-shadow: 0 0 0 0 hsl(var(--primary) / 0.5);
     }
     50% {
-      box-shadow:
-        0 0 0 14px hsl(24 78% 48% / 0),
-        0 12px 28px -10px hsl(0 0% 0% / 0.30);
+      box-shadow: 0 0 0 14px hsl(var(--primary) / 0);
     }
   }
   .mic-breath { animation: mic-breath 2.6s ease-in-out infinite; }
 
-  /* — Feed entry — slides up + brightens, then settles. */
+  /* — Feed entry slide — used on the freshest item in change feed. */
   @keyframes feed-enter {
     0%   { opacity: 0; transform: translateY(6px); }
     50%  { opacity: 1; }
@@ -223,17 +289,24 @@
   }
   .feed-enter { animation: feed-enter 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
 
-  /* — Live blip — slow horizontal shimmer on the active sensor. */
+  /* — Live blip — slow shimmer on the active sensor track. */
   @keyframes blip {
     0%, 100% { opacity: 0.55; }
     50%      { opacity: 1; }
   }
   .blip { animation: blip 2.2s ease-in-out infinite; }
 
-  /* — Editorial small-uppercase tracked label. */
+  /* — Editorial small-uppercase tracked label. Tighter than before
+   *   to push toward Bloomberg-density. */
   .label-cap {
-    font-size: 10px;
+    font-size: 9px;
     letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .label-cap-sm {
+    font-size: 8.5px;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
     font-weight: 600;
   }

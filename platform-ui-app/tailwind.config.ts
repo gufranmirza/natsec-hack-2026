@@ -107,17 +107,13 @@ const config = {
           foreground: 'hsl(var(--success-foreground))',
         },
       },
-      boxShadow: {
-        // Soft outer glow used by AppCard / SessionCard on hover.
-        glow: '0 0 22px -8px hsl(var(--ring) / 0.45)',
-        'glow-agent': '0 0 22px -8px rgb(167 139 250 / 0.55)',
-        'glow-human': '0 0 22px -8px rgb(52 211 153 / 0.55)',
-        'glow-warn': '0 0 22px -8px rgb(250 204 21 / 0.55)',
-      },
       borderRadius: {
+        // Sharp by default — operator station, not consumer SaaS.
+        // --radius is 0; lg/md/sm all collapse to 0. The brand mark
+        // and primary CTA can opt back in via rounded-[2px].
         lg: 'var(--radius)',
-        md: 'calc(var(--radius) - 2px)',
-        sm: 'calc(var(--radius) - 4px)',
+        md: 'calc(var(--radius) - 0px)',
+        sm: 'calc(var(--radius) - 0px)',
       },
       keyframes: {
         'accordion-down': {

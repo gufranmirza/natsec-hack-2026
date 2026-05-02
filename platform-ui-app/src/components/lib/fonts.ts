@@ -1,10 +1,12 @@
-import { Fraunces, Hanken_Grotesk, JetBrains_Mono } from 'next/font/google';
+import { Fraunces, Hanken_Grotesk, Space_Mono } from 'next/font/google';
 
-// Editorial tactical pairing.
-//   Fraunces (display serif, variable, with WONK + SOFT axes) —
-//     headlines, narrative verbs, hero numerals.
+// Editorial tactical pairing — distinctive choices over safe defaults.
+//   Fraunces (display serif, variable, with WONK + SOFT axes) — used
+//     sparingly: splash + Event verbs in the change feed only.
 //   Hanken Grotesk (humanist grotesk, variable) — UI chrome, body.
-//   JetBrains Mono — coordinates, timestamps, tactical data.
+//   Space Mono — coordinates, timestamps, telemetry. Distinctive
+//     typewriter character with long descenders; replaces the
+//     overused JetBrains Mono. Reads as "vintage tactical console."
 const fontSerif = Fraunces({
   subsets: ['latin'],
   variable: '--font-serif',
@@ -18,9 +20,9 @@ const fontSans = Hanken_Grotesk({
   display: 'swap',
 });
 
-const fontMono = JetBrains_Mono({
+const fontMono = Space_Mono({
   subsets: ['latin'],
-  weight: ['400', '500', '600'],
+  weight: ['400', '700'],
   variable: '--font-mono',
   display: 'swap',
 });

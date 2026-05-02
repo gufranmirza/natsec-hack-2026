@@ -2,7 +2,7 @@
 
 | Field | Value |
 | ----- | ----- |
-| Status | Proposed |
+| Status | Accepted |
 | Date | 2026-05-02 |
 | Scope | The HTTP write surface (ingest) and the HTTP read surface (UI + LLM tools), as one cohesive layer |
 | Refs | [0001 Platform Architecture](0001-platform-architecture.md), [0002 Ontology Object Specs](0002-ontology-object-specs.md) |
@@ -485,12 +485,12 @@ order.
 
 ---
 
-## 13. Open questions
+## 13. Resolved decisions (formerly open questions)
 
-| # | Question |
-| --- | --- |
-| Q-1 | Embedding generation — accept Reports with empty embedding and let a worker fill it (current plan), or block ingest? Current plan keeps ingest fast. |
-| Q-2 | Do Action-driven mutations (ADR 0004) also publish on the same bus? My pick: yes, with `_source = "system:action-svc"`. To be ratified there. |
+| # | Question | Resolution |
+| --- | --- | --- |
+| Q-1 | Embedding generation — accept Reports with empty embedding and let a worker fill it, or block ingest? | **Accept with empty embedding.** Ingest stays fast; a worker (out of v1 scope) fills `text_embedding` later. `GET /api/v1/search` returns `503` with `Retry-After` until the embedding provider is wired. |
+| Q-2 | Do Action-driven mutations (ADR 0004) also publish on the same bus? | **Yes, on the same bus**, with `_source = "system:action-svc"` and `AuditEventID` set on the `ChangelogEvent`. To be ratified in 0004; the `Bus` interface and `ChangelogEvent.AuditEventID` field are pre-shaped here so 0004 lands cleanly. |
 
 ---
 
