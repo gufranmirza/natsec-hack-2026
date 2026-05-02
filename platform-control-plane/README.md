@@ -39,6 +39,19 @@ docs/                    architecture decision records
 
 Future packages (per ADR 0001): `nats`, `ontology`, `action`, `logic`, `llm`, `ingest`.
 
+## Hackathon mission simulation API
+
+The current demo exposes an in-memory drone operations scenario:
+
+- `GET /api/v1/mission/snapshot`
+- `GET /api/v1/mission/events`
+- `GET /api/v1/recommendations`
+- `POST /api/v1/scenario/advance`
+- `POST /api/v1/scenario/reset`
+- `POST /api/v1/copilot/ask`
+- `POST /api/v1/drone-commands`
+- `POST /api/v1/comms/toggle`
+
 ## Development
 
 ```bash

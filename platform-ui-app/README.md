@@ -22,8 +22,12 @@ Validated at boot by `src/env.mjs`:
 
 ## Routes
 
-- `/`        — dashboard shell
-- `/home`    — home placeholder
+- `/`        — redirects to the drone operations console
+- `/home`    — drone-first mission command demo
+
+The `/home` demo includes scenario playback, deterministic commander copilot
+answers with citations, simulated drone sensor preview, human-approved tasking,
+and degraded-link edge execution.
 
 ## Layout
 

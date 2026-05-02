@@ -15,6 +15,7 @@ import (
 	"github.com/nsh-2026/platform-control-plane/internal/config"
 	"github.com/nsh-2026/platform-control-plane/internal/devices"
 	"github.com/nsh-2026/platform-control-plane/internal/health"
+	"github.com/nsh-2026/platform-control-plane/internal/mission"
 	"github.com/nsh-2026/platform-control-plane/internal/ontology"
 	"github.com/nsh-2026/platform-control-plane/internal/server"
 )
@@ -64,7 +65,9 @@ func run() error {
 
 	healthHandler := health.New(chConn, log.Named("health"))
 	deviceHandler := devices.New(log.Named("devices"))
-	router := server.NewRouter(healthHandler, deviceHandler, log)
+	missionStore := mission.NewStore()
+	missionHandler := mission.NewHandler(missionStore, log.Named("mission"))
+	router := server.NewRouter(healthHandler, deviceHandler, missionHandler, log)
 	srv := server.New(cfg.Server, router, log.Named("server"))
 	srv.Start()
 
