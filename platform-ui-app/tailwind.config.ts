@@ -11,16 +11,21 @@ const config = {
   prefix: '',
   theme: {
     fontFamily: {
-      // Inter + JetBrains Mono via next/font (see lib/fonts.ts).
-      // CSS variables are exposed as --font-sans and --font-mono.
+      // Hanken Grotesk + Fraunces + JetBrains Mono via next/font
+      // (see lib/fonts.ts). CSS vars: --font-sans / --font-serif / --font-mono.
       sans: [
         'var(--font-sans)',
         'ui-sans-serif',
         'system-ui',
         '-apple-system',
-        'BlinkMacSystemFont',
-        'Segoe UI',
         'sans-serif',
+      ],
+      serif: [
+        'var(--font-serif)',
+        'Iowan Old Style',
+        'Apple Garamond',
+        'Georgia',
+        'serif',
       ],
       mono: [
         'var(--font-mono)',
@@ -28,7 +33,6 @@ const config = {
         'SFMono-Regular',
         'Menlo',
         'Monaco',
-        'Consolas',
         'monospace',
       ],
     },
@@ -84,12 +88,24 @@ const config = {
           border: 'hsl(var(--sidebar-border))',
           ring: 'hsl(var(--sidebar-ring))',
         },
-        // Semantic colors used for attribution badges, kind badges,
-        // card glows.
-        agent: '#a78bfa',
-        human: '#34d399',
-        warn: '#facc15',
-        bad: '#f87171',
+        // Mission-semantic colors. Use sparingly; they signal status,
+        // never decoration.
+        threat: {
+          DEFAULT: 'hsl(var(--threat))',
+          foreground: 'hsl(var(--threat-foreground))',
+        },
+        friendly: {
+          DEFAULT: 'hsl(var(--friendly))',
+          foreground: 'hsl(var(--friendly-foreground))',
+        },
+        warning: {
+          DEFAULT: 'hsl(var(--warning))',
+          foreground: 'hsl(var(--warning-foreground))',
+        },
+        success: {
+          DEFAULT: 'hsl(var(--success))',
+          foreground: 'hsl(var(--success-foreground))',
+        },
       },
       boxShadow: {
         // Soft outer glow used by AppCard / SessionCard on hover.

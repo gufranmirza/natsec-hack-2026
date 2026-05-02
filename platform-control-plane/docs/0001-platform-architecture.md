@@ -437,7 +437,21 @@ human. The audit log records both the proposal and the confirmation.
 ## 8. Comms-denial behavior
 
 The kill-switch is a single boolean on the edge-node's NATS bridge to the
-cloud. When flipped:
+cloud. The edge node moves through three states:
+
+```mermaid
+stateDiagram-v2
+    [*] --> Connected
+    Connected --> Severed: kill-switch ON
+    Severed --> Reconciling: kill-switch OFF
+    Reconciling --> Connected: queues drained
+
+    Connected: cloud LLM available; bidirectional Object flow
+    Severed: local LLM only; edge ingest continues; Actions queue locally
+    Reconciling: outbound + inbound replay; LWW on (id, version)
+```
+
+When flipped:
 
 | Function                      | Behavior when severed                                |
 | ----------------------------- | ---------------------------------------------------- |

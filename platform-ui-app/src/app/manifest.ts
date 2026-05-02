@@ -55,7 +55,13 @@ export const Metadata = {
   },
   description:
     'Edge-native AI mission command — fused operational picture, explainable recommendations, human-in-the-loop tasking.',
-  keywords: ['defense', 'C2', 'mission command', 'edge AI', 'situational awareness'],
+  keywords: [
+    'defense',
+    'C2',
+    'mission command',
+    'edge AI',
+    'situational awareness',
+  ],
   icons: {
     icon: [
       { url: '/favicon.ico', sizes: 'any', type: 'image/x-icon' },

@@ -1,17 +1,21 @@
-import { Inter, JetBrains_Mono } from 'next/font/google';
+import { Fraunces, Hanken_Grotesk, JetBrains_Mono } from 'next/font/google';
 
-// Inter (sans) + JetBrains Mono (mono) — the working baseline.
-// We tried Geist; it didn't render the way the team wanted. Inter
-// has wider weight coverage and more predictable rendering across
-// browsers, which matters more for a SOC tool than typographic
-// novelty.
-const fontSans = Inter({
+// Editorial tactical pairing.
+//   Fraunces (display serif, variable, with WONK + SOFT axes) —
+//     headlines, narrative verbs, hero numerals.
+//   Hanken Grotesk (humanist grotesk, variable) — UI chrome, body.
+//   JetBrains Mono — coordinates, timestamps, tactical data.
+const fontSerif = Fraunces({
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
+  variable: '--font-serif',
+  display: 'swap',
+  axes: ['SOFT', 'WONK', 'opsz'],
+});
+
+const fontSans = Hanken_Grotesk({
+  subsets: ['latin'],
   variable: '--font-sans',
   display: 'swap',
-  preload: true,
-  fallback: ['system-ui', 'sans-serif'],
 });
 
 const fontMono = JetBrains_Mono({
@@ -19,8 +23,6 @@ const fontMono = JetBrains_Mono({
   weight: ['400', '500', '600'],
   variable: '--font-mono',
   display: 'swap',
-  preload: true,
-  fallback: ['ui-monospace', 'monospace'],
 });
 
-export const fonts = [fontSans.variable, fontMono.variable];
+export const fonts = [fontSans.variable, fontSerif.variable, fontMono.variable];
