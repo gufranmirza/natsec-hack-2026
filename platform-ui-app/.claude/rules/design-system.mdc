@@ -1,0 +1,32 @@
+
+## 🚨 **DESIGN SYSTEM RULE**
+
+### **MANDATORY: Always use design system variables**
+
+**NEVER hardcode colors, spacing, or typography values.**
+
+**ALWAYS reference:**
+- `src/styles/globals.css` - For color variables and design tokens
+- `src/components/ui/` - shadcn-installed primitives. Editing IS allowed
+  (system-wide design hooks need to live here), but every divergence from
+  shadcn defaults must be commented at the top of the file with a
+  "Customized" note explaining the intent so re-`shadcn add` doesn't
+  silently revert decisions.
+
+**Primary Colors:**
+- Read those from design systems css
+
+**DO NOT:**
+- Use hardcoded hex colors
+- Create custom color classes
+- Ignore existing design system components
+
+**DO:**
+- Use CSS variables from globals.css
+- Reuse existing UI components
+- Follow established patterns
+
+### **MANDATORY: Before ANY implementation, I MUST:**
+
+Must follow the design systems color and guidelines
+- ./src/styles/globals.css

@@ -1,0 +1,3 @@
+# Backend API base URL. Server-side code reads this directly;
+# browser calls would go through /api/v1/[...path] (not yet wired up).
+PLATFORM_API_URL=http://localhost:8081

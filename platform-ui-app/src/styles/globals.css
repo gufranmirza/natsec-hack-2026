@@ -1,0 +1,243 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Design tokens — Linear-inspired light theme, indigo accent.
+ *
+ * Discipline:
+ *   - Single brand hue (indigo 246°) + neutral zinc grays.
+ *     No drive-by blue/green/orange in UI chrome.
+ *   - Semantic colors reserved for status (red destructive,
+ *     amber warning, green ok). Never decorative.
+ *   - Borders are 1px, low contrast — readable surface separation
+ *     without visual noise.
+ *   - Surfaces favor subtle gradient washes over flat fills, the
+ *     Linear-style "card with light from above" feel.
+ */
+
+@layer base {
+  :root {
+    /* — Surface scale ——————————————————————————————————— */
+    --background: 0 0% 100%;             /* page — pure white */
+    --foreground: 240 10% 8%;            /* primary text */
+    --card: 0 0% 100%;                   /* card base */
+    --card-foreground: 240 10% 8%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 8%;
+
+    /* — Brand: indigo ——————————————————————————————————— */
+    /* Tailwind indigo-600 */
+    --primary: 244 76% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Gradient endpoints for hero / hover states */
+    --brand-from: 246 83% 60%;           /* indigo-500 */
+    --brand-to: 270 91% 65%;             /* violet-500 */
+
+    /* — Neutrals ——————————————————————————————————————— */
+    --secondary: 240 5% 96%;             /* zinc-100 */
+    --secondary-foreground: 240 6% 20%;
+
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;      /* zinc-500 */
+
+    --accent: 244 80% 96%;               /* very pale indigo */
+    --accent-foreground: 244 70% 35%;    /* indigo-700 */
+
+    /* — Status ————————————————————————————————————————— */
+    --destructive: 0 72% 50%;            /* red-600 */
+    --destructive-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;               /* amber-500 */
+    --warning-foreground: 30 80% 18%;
+    --success: 142 71% 38%;              /* emerald-600 */
+    --success-foreground: 0 0% 100%;
+
+    /* — Edges ——————————————————————————————————————————— */
+    --border: 240 6% 90%;                /* zinc-200 */
+    --input: 240 6% 90%;
+    --ring: 244 76% 60%;
+
+    /* — Geometry ———————————————————————————————————————— */
+    --radius: 0.625rem;                  /* slightly more than shadcn default */
+
+    /* — Sidebar — distinct surface, very subtle ————————— */
+    --sidebar-background: 240 5% 98%;
+    --sidebar-foreground: 240 6% 20%;
+    --sidebar-primary: 244 76% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 244 80% 96%;
+    --sidebar-accent-foreground: 244 70% 35%;
+    --sidebar-border: 240 6% 92%;
+    --sidebar-ring: 244 76% 60%;
+
+    /* — Chart palette — restrained, single-hue ranges ———— */
+    --chart-red-600: 0 72% 50%;
+    --chart-red-500: 0 78% 60%;
+    --chart-orange-600: 25 95% 53%;
+    --chart-orange-500: 25 95% 53%;
+    --chart-yellow-600: 45 93% 47%;
+    --chart-green-600: 142 71% 38%;
+    --chart-blue-600: 244 76% 60%;
+    --chart-indigo-600: 244 76% 60%;
+    --chart-purple-600: 270 91% 65%;
+    --chart-gray-600: 240 4% 46%;
+    --chart-primary: 244 76% 60%;
+  }
+
+  .dark {
+    /* Light is primary today; dark mode tokens are a starting
+     * point that will be tightened in a follow-up pass. */
+    --background: 240 10% 4%;
+    --foreground: 240 5% 96%;
+    --card: 240 10% 6%;
+    --card-foreground: 240 5% 96%;
+    --popover: 240 10% 6%;
+    --popover-foreground: 240 5% 96%;
+
+    --primary: 244 76% 65%;
+    --primary-foreground: 0 0% 100%;
+    --brand-from: 246 83% 65%;
+    --brand-to: 270 91% 70%;
+
+    --secondary: 240 6% 12%;
+    --secondary-foreground: 240 5% 96%;
+
+    --muted: 240 6% 12%;
+    --muted-foreground: 240 5% 60%;
+
+    --accent: 244 50% 18%;
+    --accent-foreground: 244 80% 80%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --warning: 38 90% 55%;
+    --warning-foreground: 30 80% 12%;
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+
+    --border: 240 6% 16%;
+    --input: 240 6% 16%;
+    --ring: 244 76% 65%;
+
+    --sidebar-background: 240 10% 6%;
+    --sidebar-foreground: 240 5% 90%;
+    --sidebar-primary: 244 76% 65%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 6% 12%;
+    --sidebar-accent-foreground: 244 80% 80%;
+    --sidebar-border: 240 6% 16%;
+    --sidebar-ring: 244 76% 65%;
+
+    --chart-red-600: 0 78% 60%;
+    --chart-red-500: 0 78% 60%;
+    --chart-orange-600: 25 95% 60%;
+    --chart-orange-500: 25 95% 60%;
+    --chart-yellow-600: 45 93% 55%;
+    --chart-green-600: 142 71% 50%;
+    --chart-blue-600: 244 76% 65%;
+    --chart-indigo-600: 244 76% 65%;
+    --chart-purple-600: 270 91% 70%;
+    --chart-gray-600: 240 5% 60%;
+    --chart-primary: 244 76% 65%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html, body {
+    @apply bg-background text-foreground antialiased;
+    /* Inter stylistic alternates: cv11 = single-story `a`,
+     * ss01 = open digits. Both improve readability in dense
+     * tables. Other Inter `cv` features we tried (cv02, cv03,
+     * cv04) were a wash — left them off. */
+    font-feature-settings: 'cv11', 'ss01';
+  }
+  /* Numerics: tabular by default — cleaner alignment in tables and
+   * detail cards without per-element class application. */
+  .tabular,
+  table,
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
+  /* Remove default browser bolding noise; we control weight via
+   * font-medium / font-semibold explicitly. */
+  h1, h2, h3, h4, h5, h6, strong, b {
+    font-weight: 600;
+  }
+}
+
+@layer utilities {
+  /* — Premium card surface ————————————————————————————————
+   * A near-white card with a subtle top-down gradient — the
+   * "soft light from above" finish. Use as a className modifier
+   * on any container that wants to read as elevated. */
+  .surface-card {
+    background:
+      linear-gradient(
+        180deg,
+        hsl(var(--card)) 0%,
+        hsl(240 10% 99%) 100%
+      );
+  }
+  .surface-card-elevated {
+    background:
+      linear-gradient(
+        180deg,
+        hsl(var(--card)) 0%,
+        hsl(240 10% 98%) 100%
+      );
+    box-shadow:
+      0 1px 0 0 hsl(240 8% 95%) inset,
+      0 1px 2px -1px hsl(240 10% 70% / 0.08);
+  }
+  .dark .surface-card {
+    background:
+      linear-gradient(
+        180deg,
+        hsl(var(--card)) 0%,
+        hsl(240 10% 7%) 100%
+      );
+  }
+  .dark .surface-card-elevated {
+    background:
+      linear-gradient(
+        180deg,
+        hsl(240 10% 8%) 0%,
+        hsl(240 10% 5%) 100%
+      );
+    box-shadow:
+      0 1px 0 0 hsl(240 6% 18%) inset,
+      0 1px 2px -1px hsl(0 0% 0% / 0.5);
+  }
+
+  /* — Brand gradient text + surface ——————————————————————— */
+  .brand-gradient-text {
+    background: linear-gradient(
+      135deg,
+      hsl(var(--brand-from)) 0%,
+      hsl(var(--brand-to)) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .brand-gradient-bg {
+    background: linear-gradient(
+      135deg,
+      hsl(var(--brand-from)) 0%,
+      hsl(var(--brand-to)) 100%
+    );
+  }
+
+  /* Hairline divider — softer than border-border for inline
+   * separators inside cards. */
+  .hairline {
+    border-color: hsl(240 6% 94%);
+  }
+  .dark .hairline {
+    border-color: hsl(240 6% 14%);
+  }
+}
