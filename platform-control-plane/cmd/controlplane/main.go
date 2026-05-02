@@ -14,6 +14,7 @@ import (
 	"github.com/nsh-2026/platform-control-plane/internal/clickhouse"
 	"github.com/nsh-2026/platform-control-plane/internal/config"
 	"github.com/nsh-2026/platform-control-plane/internal/health"
+	"github.com/nsh-2026/platform-control-plane/internal/mission"
 	"github.com/nsh-2026/platform-control-plane/internal/server"
 )
 
@@ -57,7 +58,9 @@ func run() error {
 	}()
 
 	healthHandler := health.New(chConn, log.Named("health"))
-	router := server.NewRouter(healthHandler, log)
+	missionStore := mission.NewStore()
+	missionHandler := mission.NewHandler(missionStore, log.Named("mission"))
+	router := server.NewRouter(healthHandler, missionHandler, log)
 	srv := server.New(cfg.Server, router, log.Named("server"))
 	srv.Start()
 
