@@ -52,14 +52,62 @@ func (e *Entity) SetPosition(p Position) { e.Lat, e.Lon = p.Lat, p.Lon }
 // Event — discrete occurrences.
 // ----------------------------------------------------------------------------
 
-// Event subtypes.
+// Event subtypes. Extended per UI ADR 0002 §12 (OP SILENT EYE) to cover
+// realistic warfare event taxonomy across ISR / C2 / kinetic / maneuver /
+// logistics / OSINT categories. ClickHouse _subtype column is
+// LowCardinality(String) so no schema migration is required when adding new
+// values — only the validate.go allowlist must be kept in sync with this
+// const block.
 const (
+	// legacy / generic
 	EventSubtypeDetection  = "detection"
 	EventSubtypeDeviation  = "deviation"
 	EventSubtypeRFPing     = "rf_ping"
 	EventSubtypeAISGap     = "ais_gap"
 	EventSubtypeAnomaly    = "anomaly"
 	EventSubtypeReportLink = "report_link"
+
+	// ISR
+	EventSubtypeVisualDetection      = "visual_detection"
+	EventSubtypeCuedSearch           = "cued_search"
+	EventSubtypeTrackAcquired        = "track_acquired"
+	EventSubtypeTrackLost            = "track_lost"
+	EventSubtypeRegainedTrack        = "regained_track"
+	EventSubtypeClassificationUpgrade = "classification_upgrade"
+	EventSubtypeThermalSignature     = "thermal_signature"
+
+	// C2 / comms
+	EventSubtypeSigintIntercept = "sigint_intercept"
+	EventSubtypeCommsOutage     = "comms_outage"
+	EventSubtypeJamPulse        = "jam_pulse"
+	EventSubtypeGPSDeniedZone   = "gps_denied_zone"
+	EventSubtypePositionReport  = "position_report"
+
+	// kinetic
+	EventSubtypeArtilleryImpact         = "artillery_impact"
+	EventSubtypeMissileLaunch           = "missile_launch"
+	EventSubtypeAirStrike               = "air_strike"
+	EventSubtypeFPVStrike               = "fpv_strike"
+	EventSubtypeLoiteringMunitionEngage = "loitering_munition_engage"
+	EventSubtypeSmallArmsContact        = "small_arms_contact"
+	EventSubtypeCounterBatteryFire      = "counter_battery_fire"
+
+	// maneuver
+	EventSubtypeGroundAdvance          = "ground_advance"
+	EventSubtypeWithdrawal             = "withdrawal"
+	EventSubtypeBreachAttempt          = "breach_attempt"
+	EventSubtypeDefensiveConsolidation = "defensive_consolidation"
+	EventSubtypeSmokeScreen            = "smoke_screen"
+	EventSubtypeTerrainObscuration     = "terrain_obscuration"
+
+	// logistics & lifecycle
+	EventSubtypeCasevacRequest    = "casevac_request"
+	EventSubtypeMedevacDispatched = "medevac_dispatched"
+	EventSubtypeUnitDestroyed     = "unit_destroyed"
+	EventSubtypeUnitDamaged       = "unit_damaged"
+
+	// OSINT
+	EventSubtypeGeotaggedSocialPost = "geotagged_social_post"
 )
 
 // Severity values.

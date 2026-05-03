@@ -28,7 +28,33 @@ func (e *ValidationError) Unwrap() []error { return e.Errs }
 var (
 	entitySubtypes      = []string{EntitySubtypeVessel, EntitySubtypeAircraft, EntitySubtypeVehicle, EntitySubtypePerson, EntitySubtypeThreat, EntitySubtypeUnknown}
 	threatLevels        = []string{ThreatLevelNone, ThreatLevelLow, ThreatLevelMed, ThreatLevelHigh}
-	eventSubtypes       = []string{EventSubtypeDetection, EventSubtypeDeviation, EventSubtypeRFPing, EventSubtypeAISGap, EventSubtypeAnomaly, EventSubtypeReportLink}
+	// eventSubtypes — keep in lockstep with the const block in objects.go.
+	// Extended per UI ADR 0002 §12 to cover realistic warfare event taxonomy.
+	eventSubtypes = []string{
+		// legacy / generic
+		EventSubtypeDetection, EventSubtypeDeviation, EventSubtypeRFPing,
+		EventSubtypeAISGap, EventSubtypeAnomaly, EventSubtypeReportLink,
+		// ISR
+		EventSubtypeVisualDetection, EventSubtypeCuedSearch,
+		EventSubtypeTrackAcquired, EventSubtypeTrackLost, EventSubtypeRegainedTrack,
+		EventSubtypeClassificationUpgrade, EventSubtypeThermalSignature,
+		// C2 / comms
+		EventSubtypeSigintIntercept, EventSubtypeCommsOutage, EventSubtypeJamPulse,
+		EventSubtypeGPSDeniedZone, EventSubtypePositionReport,
+		// kinetic
+		EventSubtypeArtilleryImpact, EventSubtypeMissileLaunch, EventSubtypeAirStrike,
+		EventSubtypeFPVStrike, EventSubtypeLoiteringMunitionEngage,
+		EventSubtypeSmallArmsContact, EventSubtypeCounterBatteryFire,
+		// maneuver
+		EventSubtypeGroundAdvance, EventSubtypeWithdrawal, EventSubtypeBreachAttempt,
+		EventSubtypeDefensiveConsolidation, EventSubtypeSmokeScreen,
+		EventSubtypeTerrainObscuration,
+		// logistics & lifecycle
+		EventSubtypeCasevacRequest, EventSubtypeMedevacDispatched,
+		EventSubtypeUnitDestroyed, EventSubtypeUnitDamaged,
+		// OSINT
+		EventSubtypeGeotaggedSocialPost,
+	}
 	severities          = []string{SeverityInfo, SeverityWarn, SeverityCritical}
 	reportSubtypes      = []string{ReportSubtypeOperator, ReportSubtypeRadio, ReportSubtypeSigint, ReportSubtypeOSINT, ReportSubtypeUnknown}
 	classifications     = []string{ClassificationUnclass, ClassificationCUI, ClassificationConfidential}
