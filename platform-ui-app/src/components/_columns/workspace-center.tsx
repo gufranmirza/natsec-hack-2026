@@ -303,7 +303,7 @@ function FusionEventsRail({
   );
   const changes = newest.filter(isStateChangeEvent);
   return (
-    <aside className="bg-background flex min-h-0 flex-col overflow-hidden">
+    <aside className="bg-card flex min-h-0 flex-col overflow-hidden">
       <Section
         title="Mission events"
         meta={`${newest.length} total · ${sourceEvents.length} on this source`}
