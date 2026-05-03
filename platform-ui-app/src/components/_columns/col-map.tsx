@@ -196,6 +196,8 @@ export function ColMap({
         </div>
       </div>
 
+      <UnifiedFeedsPanel entities={entities} units={units} events={events} />
+
       <AlertsPriorityPanel
         entities={entities}
         units={units}
@@ -217,6 +219,7 @@ export function ColMap({
       </div>
 
       <RealTimeMapFeed events={events} onSelect={onSelect} />
+      <SupervisedWorkflowPanel recommendations={recommendations} />
 
       <div className="border-border bg-card/95 absolute bottom-3 right-3 z-30 grid border backdrop-blur">
         <button
@@ -496,6 +499,91 @@ function MissionMarkers({
   );
 }
 
+function UnifiedFeedsPanel({
+  entities,
+  units,
+  events,
+}: {
+  entities: Entity[];
+  units: Unit[];
+  events: Event[];
+}) {
+  const sourceRows = [
+    {
+      label: 'Sensor tracks',
+      value: entities.length,
+      meta: `${events.filter((event) => event._subtype === 'detection').length} detections`,
+      tone: 'friendly' as const,
+    },
+    {
+      label: 'Unit positions',
+      value: units.length,
+      meta: `${units.filter((unit) => unit.status !== 'offline').length} online`,
+      tone: 'friendly' as const,
+    },
+    {
+      label: 'Vehicles',
+      value: entities.filter((entity) => entity._subtype === 'Vehicle').length,
+      meta: 'track + route relation',
+      tone: 'warning' as const,
+    },
+    {
+      label: 'Comms',
+      value: events.filter((event) => event._source.includes('voice')).length,
+      meta: 'radio-linked',
+      tone: 'muted' as const,
+    },
+    {
+      label: 'Intel reports',
+      value: events.filter((event) => event._source === 'mission-ai').length,
+      meta: 'parsed to graph',
+      tone: 'muted' as const,
+    },
+    {
+      label: 'RF / OSINT',
+      value: events.filter(
+        (event) => event._source === 'radio' || event._source === 'social'
+      ).length,
+      meta: 'cross-cued',
+      tone: 'warning' as const,
+    },
+  ];
+
+  return (
+    <div className="border-border bg-card/95 absolute right-3 top-[178px] z-30 hidden w-[236px] border backdrop-blur xl:block">
+      <div className="border-border border-b px-3 py-2">
+        <div className="label-cap-sm text-muted-foreground">Unified feeds</div>
+        <div className="text-foreground font-mono text-[11px] font-bold">
+          Live source fusion
+        </div>
+      </div>
+      <div className="bg-border grid gap-px">
+        {sourceRows.map((row) => (
+          <div
+            key={row.label}
+            className="bg-card grid grid-cols-[1fr_auto] gap-2 px-3 py-2"
+          >
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className={`size-1.5 shrink-0 ${sourceDot(row.tone)}`} />
+                <span className="text-foreground truncate font-mono text-[10px] font-bold">
+                  {row.label}
+                </span>
+              </div>
+              <div className="text-muted-foreground mt-0.5 truncate font-mono text-[9px]">
+                {row.meta}
+              </div>
+            </div>
+            <span className="text-primary font-mono text-[13px] font-bold">
+              {row.value}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function AlertsPriorityPanel({
   entities,
   units,
@@ -611,6 +699,69 @@ function AlertsPriorityPanel({
   );
 }
 
+function SupervisedWorkflowPanel({
+  recommendations,
+}: {
+  recommendations: Recommendation[];
+}) {
+  const pending = recommendations.filter(
+    (recommendation) => recommendation.status === 'pending'
+  ).length;
+  const accepted = recommendations.filter(
+    (recommendation) => recommendation.status === 'accepted'
+  ).length;
+  const steps = [
+    ['Detect', 'RF/EO cue'],
+    ['Identify', 'graph link'],
+    ['Recommend', `${pending} pending`],
+    ['Approve', 'human gate'],
+    ['Task', 'ISR only'],
+    ['Audit', `${accepted} accepted`],
+  ];
+
+  return (
+    <div className="border-border bg-card/95 absolute bottom-3 right-[104px] z-30 hidden w-[430px] border backdrop-blur xl:block">
+      <div className="border-border flex items-baseline justify-between border-b px-3 py-2">
+        <div>
+          <div className="label-cap-sm text-muted-foreground">
+            Supervised decision chain
+          </div>
+          <div className="text-foreground font-mono text-[11px] font-bold">
+            Detect to tasking with approval gate
+          </div>
+        </div>
+        <span className="text-warning font-mono text-[9px] font-bold uppercase">
+          HITL
+        </span>
+      </div>
+      <div className="divide-border grid grid-cols-6 divide-x">
+        {steps.map(([label, meta], index) => (
+          <div key={label} className="p-2 text-center">
+            <div
+              className={[
+                'mx-auto mb-1 grid size-5 place-items-center font-mono text-[10px] font-bold',
+                index < 3
+                  ? 'bg-primary text-primary-foreground'
+                  : index === 3
+                    ? 'bg-warning text-background'
+                    : 'bg-secondary text-foreground',
+              ].join(' ')}
+            >
+              {index + 1}
+            </div>
+            <div className="text-foreground truncate font-mono text-[9px] font-bold">
+              {label}
+            </div>
+            <div className="text-muted-foreground mt-0.5 truncate font-mono text-[8px]">
+              {meta}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function PriorityMetric({
   label,
   value,
@@ -645,6 +796,12 @@ function priorityDot(tone: 'critical' | 'decision' | 'warning') {
   if (tone === 'critical') return 'bg-threat';
   if (tone === 'decision') return 'bg-primary';
   return 'bg-warning';
+}
+
+function sourceDot(tone: 'friendly' | 'warning' | 'muted') {
+  if (tone === 'friendly') return 'bg-friendly';
+  if (tone === 'warning') return 'bg-warning';
+  return 'bg-muted-foreground';
 }
 
 function RealTimeMapFeed({

@@ -653,6 +653,29 @@ function OntologySurface({
               edge="tasks"
               right="ROOK-1 / ROOK-2 / BRAVO-3"
             />
+            <PanelTitle title="Emerging patterns" meta="real-time graph" />
+            <div className="grid grid-cols-2 gap-2">
+              <PatternCard
+                title="Multi-source convergence"
+                score="high"
+                body="BOGEY-7 is referenced by EO/IR, RF cueing, report links, and OSINT-style events inside the same mission window."
+              />
+              <PatternCard
+                title="Route risk cluster"
+                score="med"
+                body="V-117, BOGEY-7, and DQ-842 events cluster near the convoy route and occupied-terrain boundary."
+              />
+              <PatternCard
+                title="Report-to-entity link"
+                score="active"
+                body={`${reports.length} reports and ${events.length} events are normalized into typed objects with entity, unit, source, timestamp, and payload fields.`}
+              />
+              <PatternCard
+                title="Commander decision pressure"
+                score="active"
+                body="Pending recommendations preserve evidence references and require explicit approval before drone tasking mutates mission state."
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -913,8 +936,8 @@ function IntelligenceSurface({
               meta="RAG"
             />
             <EvidenceCard
-              title="Tool layer"
-              body="Commands resolve to explicit actions: inject source, launch drone, coordinate swarm, generate plan, approve recommendation."
+              title="Supervised kill-chain tools"
+              body="Detection, identification, recommendation, and ISR tasking are automated as visible steps; approval remains explicit and human-controlled."
               meta="tools"
             />
             <EvidenceCard
@@ -1230,6 +1253,32 @@ function ObjectField({ label, value }: { label: string; value: string }) {
       <div className="text-foreground mt-1 truncate font-mono text-[11px] font-bold">
         {value}
       </div>
+    </div>
+  );
+}
+
+function PatternCard({
+  title,
+  body,
+  score,
+}: {
+  title: string;
+  body: string;
+  score: string;
+}) {
+  return (
+    <div className="border-border bg-card border p-3">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-foreground truncate font-mono text-[11px] font-bold">
+          {title}
+        </span>
+        <span className="text-primary font-mono text-[9px] uppercase">
+          {score}
+        </span>
+      </div>
+      <p className="text-muted-foreground mt-1 text-[11px] leading-snug">
+        {body}
+      </p>
     </div>
   );
 }
