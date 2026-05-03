@@ -11,8 +11,10 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
+	"github.com/nsh-2026/platform-control-plane/internal/api/agent"
 	"github.com/nsh-2026/platform-control-plane/internal/api/ingest"
 	"github.com/nsh-2026/platform-control-plane/internal/api/read"
+	"github.com/nsh-2026/platform-control-plane/internal/api/wsfeed"
 	"github.com/nsh-2026/platform-control-plane/internal/bus"
 	"github.com/nsh-2026/platform-control-plane/internal/clickhouse"
 	"github.com/nsh-2026/platform-control-plane/internal/config"
@@ -71,7 +73,22 @@ func run() error {
 		Health: health.New(chConn, log.Named("health")),
 		Ingest: ingest.New(store, changelogBus, log.Named("ingest")),
 		Read:   read.New(store, log.Named("read")),
+		Feed:   wsfeed.New(changelogBus, log.Named("wsfeed")),
 	}
+
+	// Mount the agent endpoints only if Azure OpenAI is configured. Missing
+	// credentials degrade to 503 on /operator/query rather than failing boot.
+	if azCfg, err := agent.AzureConfigFromEnv(); err == nil {
+		reasoner, err := agent.NewAzureReasoner(azCfg, log.Named("agent.azure"))
+		if err != nil {
+			log.Warn("agent: azure reasoner init failed; endpoints will return 503", zap.Error(err))
+		} else {
+			routes.Agent = agent.New(reasoner, log.Named("agent"))
+		}
+	} else {
+		log.Info("agent: AZURE_OPENAI_* env not set; /operator/query will return 503")
+	}
+
 	cors := server.CORSConfig{AllowOrigin: os.Getenv("CORS_ALLOWED_ORIGIN")}
 	router := server.NewRouter(routes, cors, log)
 

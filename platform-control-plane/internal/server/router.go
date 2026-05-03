@@ -5,8 +5,10 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/nsh-2026/platform-control-plane/internal/api/agent"
 	"github.com/nsh-2026/platform-control-plane/internal/api/ingest"
 	"github.com/nsh-2026/platform-control-plane/internal/api/read"
+	"github.com/nsh-2026/platform-control-plane/internal/api/wsfeed"
 	"github.com/nsh-2026/platform-control-plane/internal/health"
 )
 
@@ -15,6 +17,8 @@ type Routes struct {
 	Health *health.Handler
 	Ingest *ingest.Handler
 	Read   *read.Handler
+	Feed   *wsfeed.Handler
+	Agent  *agent.Handler // optional — nil if Azure OpenAI not configured
 }
 
 // CORSConfig drives the response of the CORS middleware. Empty AllowOrigin
@@ -47,8 +51,30 @@ func NewRouter(routes Routes, cors CORSConfig, log *zap.Logger) http.Handler {
 	mux.HandleFunc("GET /api/v1/changelog", routes.Read.HandleChangelog)
 	mux.HandleFunc("GET /api/v1/search", routes.Read.HandleSearch)
 
+	// UI ADR 0002 §13 — SSE fan-out of the changelog bus for live UI streaming.
+	if routes.Feed != nil {
+		mux.HandleFunc("GET /api/v1/feed", routes.Feed.HandleSSE)
+	}
+
+	// Operator-facing agent loop. Only mounted when Azure OpenAI is configured.
+	if routes.Agent != nil {
+		mux.HandleFunc("POST /api/v1/operator/query", routes.Agent.HandleQuery)
+		mux.HandleFunc("POST /api/v1/recommendations/{id}/decision", routes.Agent.HandleDecision)
+	} else {
+		mux.HandleFunc("POST /api/v1/operator/query", agentNotConfigured)
+		mux.HandleFunc("POST /api/v1/recommendations/{id}/decision", agentNotConfigured)
+	}
+
 	_ = log
 	return withCORS(mux, cors)
+}
+
+// agentNotConfigured is the placeholder responder when no Azure OpenAI
+// credentials are present. Always 503 — operator UI knows how to surface this.
+func agentNotConfigured(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusServiceUnavailable)
+	_, _ = w.Write([]byte(`{"error":"agent disabled: AZURE_OPENAI_ENDPOINT / AZURE_OPENAI_API_KEY / AZURE_OPENAI_DEPLOYMENT not set"}`))
 }
 
 func withCORS(next http.Handler, cfg CORSConfig) http.Handler {
