@@ -28,17 +28,31 @@ export const getEvents = async (
   params?: EventsListParams,
   token?: string,
 ): Promise<Page<Event>> => {
-  return apiClient<Page<Event>>(
+  const page = await apiClient<Page<Event>>(
     `/api/v1/objects/Event${buildQuery(params)}`,
     {},
     token,
   );
+  return { ...page, items: page.items.map(normalizeEvent) };
 };
 
 export const getEvent = async (id: string, token?: string): Promise<Event> => {
-  return apiClient<Event>(
+  const event = await apiClient<Event>(
     `/api/v1/objects/Event/${encodeURIComponent(id)}`,
     {},
     token,
   );
+  return normalizeEvent(event);
 };
+
+// CP serializes geo as separate `lat` / `lon` columns; the UI ontology
+// expects `position: [lat, lon]` (optional on Event). Bridge here so
+// every consumer sees the uniform shape.
+function normalizeEvent(raw: Event): Event {
+  if (Array.isArray(raw.position)) return raw;
+  const r = raw as unknown as { lat?: unknown; lon?: unknown };
+  if (typeof r.lat === 'number' && typeof r.lon === 'number') {
+    return { ...raw, position: [r.lat, r.lon] };
+  }
+  return raw;
+}

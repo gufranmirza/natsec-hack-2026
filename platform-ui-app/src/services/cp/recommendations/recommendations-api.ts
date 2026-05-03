@@ -5,7 +5,7 @@ import {
   buildCommonParams,
   qs,
 } from '@/services/cp/shared';
-import type { Recommendation } from '@/types/ontology';
+import type { ActionGating, Recommendation } from '@/types/ontology';
 
 // RecommendationsListParams extends CommonListParams with FK filters
 // the CP read API supports for the recommendation table:
@@ -30,20 +30,108 @@ export const getRecommendations = async (
   params?: RecommendationsListParams,
   token?: string,
 ): Promise<Page<Recommendation>> => {
-  return apiClient<Page<Recommendation>>(
+  const page = await apiClient<Page<Recommendation>>(
     `/api/v1/objects/Recommendation${buildQuery(params)}`,
     {},
     token,
   );
+  return { ...page, items: page.items.map(normalizeRecommendation) };
 };
 
 export const getRecommendation = async (
   id: string,
   token?: string,
 ): Promise<Recommendation> => {
-  return apiClient<Recommendation>(
+  const rec = await apiClient<Recommendation>(
     `/api/v1/objects/Recommendation/${encodeURIComponent(id)}`,
     {},
     token,
   );
+  return normalizeRecommendation(rec);
 };
+
+// ──────────────────────────────────────────────────────────────────
+// Wire→UI normalizer
+//
+// The CP serializes `proposed_params` as a JSON string and doesn't
+// emit the UI-only display helpers (`verb`, `short`, `gating`, `why`)
+// the recommendation card needs. We fill them here so every consumer
+// downstream (the column, the chat panel, the recengine→agent merge
+// in _view.tsx) sees a uniform shape.
+// ──────────────────────────────────────────────────────────────────
+
+const ACTION_VERB: Record<string, string> = {
+  fire_himars: 'Fire',
+  clear_fpv_kinetic: 'Engage',
+  reroute_medical: 'Re-route',
+  dispatch_medevac: 'Dispatch',
+  vector_isr: 'Vector',
+  dispatchdrone: 'Dispatch',
+  launch_swarm: 'Launch',
+  launch: 'Launch',
+  intercept: 'Intercept',
+  handoff: 'Hand-off',
+  retask: 'Re-task',
+  observe: 'Observe',
+};
+
+function verbFor(actionType: string): string {
+  const key = actionType.toLowerCase();
+  if (ACTION_VERB[key]) return ACTION_VERB[key];
+  // Humanize: "vector_isr" → "Vector", "dispatchDrone" → "Dispatch"
+  const head = key.split(/[_\s]/)[0] ?? actionType;
+  return head.charAt(0).toUpperCase() + head.slice(1);
+}
+
+function shortFor(rationale: string, actionType: string): string {
+  const trimmed = (rationale ?? '').trim();
+  if (!trimmed) return actionType.replace(/_/g, ' ');
+  const firstSentence = trimmed.split(/(?<=[.!?])\s+/)[0] ?? trimmed;
+  return firstSentence.length > 160
+    ? `${firstSentence.slice(0, 157)}…`
+    : firstSentence;
+}
+
+function gatingFrom(params: Record<string, unknown>): ActionGating {
+  const g = params.gating;
+  if (g === 'auto' || g === 'confirm' || g === 'forbid-llm') return g;
+  return 'confirm';
+}
+
+function whyChips(rec: Recommendation): string[] {
+  const chips: string[] = [];
+  const evidenceCount = rec.evidence_refs?.length ?? 0;
+  if (evidenceCount > 0) {
+    chips.push(`${evidenceCount} evidence ref${evidenceCount === 1 ? '' : 's'}`);
+  }
+  if (rec._source) chips.push(rec._source.replace(/^system:/, ''));
+  return chips;
+}
+
+export function normalizeRecommendation(raw: Recommendation): Recommendation {
+  // proposed_params is sometimes serialized as a JSON string by the CP.
+  let params: Record<string, unknown>;
+  if (typeof raw.proposed_params === 'string') {
+    try {
+      params = JSON.parse(raw.proposed_params) as Record<string, unknown>;
+    } catch {
+      params = {};
+    }
+  } else {
+    params = (raw.proposed_params ?? {}) as Record<string, unknown>;
+  }
+
+  const verb = raw.verb ?? verbFor(raw.proposed_action_type);
+  const short = raw.short ?? shortFor(raw.rationale, raw.proposed_action_type);
+  const gating = raw.gating ?? gatingFrom(params);
+  const why = raw.why ?? whyChips(raw);
+
+  return {
+    ...raw,
+    proposed_params: params,
+    verb,
+    short,
+    gating,
+    why,
+  };
+}

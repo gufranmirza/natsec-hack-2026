@@ -20,17 +20,31 @@ export const getUnits = async (
   params?: UnitsListParams,
   token?: string,
 ): Promise<Page<Unit>> => {
-  return apiClient<Page<Unit>>(
+  const page = await apiClient<Page<Unit>>(
     `/api/v1/objects/Unit${buildQuery(params)}`,
     {},
     token,
   );
+  return { ...page, items: page.items.map(normalizeUnit) };
 };
 
 export const getUnit = async (id: string, token?: string): Promise<Unit> => {
-  return apiClient<Unit>(
+  const unit = await apiClient<Unit>(
     `/api/v1/objects/Unit/${encodeURIComponent(id)}`,
     {},
     token,
   );
+  return normalizeUnit(unit);
 };
+
+// CP serializes geo as separate `lat` / `lon` columns; the UI ontology
+// expects `position: [lat, lon]`. Bridge here so every consumer sees
+// the uniform shape the type system promises.
+function normalizeUnit(raw: Unit): Unit {
+  if (Array.isArray(raw.position)) return raw;
+  const r = raw as unknown as { lat?: unknown; lon?: unknown };
+  if (typeof r.lat === 'number' && typeof r.lon === 'number') {
+    return { ...raw, position: [r.lat, r.lon] };
+  }
+  return raw;
+}
