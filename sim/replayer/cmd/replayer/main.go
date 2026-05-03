@@ -56,8 +56,8 @@ var typeToEndpoint = map[string]string{
 }
 
 // Per-type fields that are TS-only (not in Go ontology) and must be stripped.
+// Affiliation moved out of this map after CP added entity.affiliation column.
 var tsOnlyFields = map[string]map[string]bool{
-	"Entity":         {"affiliation": true},
 	"Event":          {"verb": true},
 	"Recommendation": {"verb": true, "short": true, "asset_callsign": true, "eta": true, "why": true, "gating": true},
 }

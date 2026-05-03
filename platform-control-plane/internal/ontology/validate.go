@@ -28,6 +28,10 @@ func (e *ValidationError) Unwrap() []error { return e.Errs }
 var (
 	entitySubtypes      = []string{EntitySubtypeVessel, EntitySubtypeAircraft, EntitySubtypeVehicle, EntitySubtypePerson, EntitySubtypeThreat, EntitySubtypeUnknown}
 	threatLevels        = []string{ThreatLevelNone, ThreatLevelLow, ThreatLevelMed, ThreatLevelHigh}
+	// affiliations: empty string is also accepted on validate (legacy rows
+	// pre-affiliation-column have it empty; reads project empty → "unknown"
+	// at the UI layer).
+	affiliations = []string{AffiliationFriendly, AffiliationHostile, AffiliationUnknown, AffiliationNeutral, ""}
 	// eventSubtypes — keep in lockstep with the const block in objects.go.
 	// Extended per UI ADR 0002 §12 to cover realistic warfare event taxonomy.
 	eventSubtypes = []string{
@@ -119,6 +123,9 @@ func ValidateEntity(e *Entity) error {
 		errs = append(errs, err)
 	}
 	if err := mustBeOneOf("threat_level", e.ThreatLevel, threatLevels); err != nil {
+		errs = append(errs, err)
+	}
+	if err := mustBeOneOf("affiliation", e.Affiliation, affiliations); err != nil {
 		errs = append(errs, err)
 	}
 	if err := positionValid(e.Lat, e.Lon); err != nil {

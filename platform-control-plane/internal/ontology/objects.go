@@ -24,22 +24,34 @@ const (
 	ThreatLevelHigh = "high"
 )
 
+// Affiliation values. Mirrors the TS Affiliation union and drives the
+// glyph color on the UI map (friendly = blue, hostile = red, unknown =
+// amber, neutral = grey). Empty string is treated as 'unknown' on read
+// for backwards compatibility with rows ingested before this column.
+const (
+	AffiliationFriendly = "friendly"
+	AffiliationHostile  = "hostile"
+	AffiliationUnknown  = "unknown"
+	AffiliationNeutral  = "neutral"
+)
+
 // Entity is anything observable on the map. One table, discriminated by
 // Subtype.
 type Entity struct {
 	Envelope
-	Subtype     string  `ch:"_subtype"     json:"_subtype"`
-	SourceRef   *string `ch:"_source_ref"  json:"_source_ref,omitempty"`
-	Name        *string `ch:"name"         json:"name,omitempty"`
-	Lat         float64 `ch:"lat"          json:"lat"`
-	Lon         float64 `ch:"lon"          json:"lon"`
-	AltitudeM   *float64 `ch:"altitude_m"  json:"altitude_m,omitempty"`
-	HeadingDeg  *float64 `ch:"heading_deg" json:"heading_deg,omitempty"`
-	SpeedMps    *float64 `ch:"speed_mps"   json:"speed_mps,omitempty"`
-	CourseDeg   *float64 `ch:"course_deg"  json:"course_deg,omitempty"`
-	Confidence  float32 `ch:"confidence"   json:"confidence"`
-	ThreatLevel string  `ch:"threat_level" json:"threat_level"`
-	Attributes  map[string]string `ch:"attributes" json:"attributes,omitempty"`
+	Subtype     string            `ch:"_subtype"     json:"_subtype"`
+	SourceRef   *string           `ch:"_source_ref"  json:"_source_ref,omitempty"`
+	Name        *string           `ch:"name"         json:"name,omitempty"`
+	Lat         float64           `ch:"lat"          json:"lat"`
+	Lon         float64           `ch:"lon"          json:"lon"`
+	AltitudeM   *float64          `ch:"altitude_m"   json:"altitude_m,omitempty"`
+	HeadingDeg  *float64          `ch:"heading_deg"  json:"heading_deg,omitempty"`
+	SpeedMps    *float64          `ch:"speed_mps"    json:"speed_mps,omitempty"`
+	CourseDeg   *float64          `ch:"course_deg"   json:"course_deg,omitempty"`
+	Confidence  float32           `ch:"confidence"   json:"confidence"`
+	ThreatLevel string            `ch:"threat_level" json:"threat_level"`
+	Affiliation string            `ch:"affiliation"  json:"affiliation,omitempty"`
+	Attributes  map[string]string `ch:"attributes"   json:"attributes,omitempty"`
 }
 
 // Position returns the lat/lon as a Position value.

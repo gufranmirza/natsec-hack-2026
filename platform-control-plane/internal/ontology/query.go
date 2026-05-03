@@ -13,7 +13,13 @@ import (
 
 // Filter is the locked v1 set of read filters per ADR 0003 §8.2. Zero values
 // mean "no filter on this field." Repeated string filters use OR semantics.
+//
+// FK filters (EntityID, UnitID, etc.) are applied per Object Type table by
+// the relevant Where* function; passing one to a type that lacks the column
+// is a no-op (the relevant Where* simply doesn't call applyFKEvent etc.).
+// Bloom-filter indexes on the FK columns make these queries cheap.
 type Filter struct {
+	// Common filters (apply to every Object Type table).
 	Subtypes       []string
 	Sources        []string
 	SourceRef      string
@@ -21,8 +27,21 @@ type Filter struct {
 	ObservedAfter  time.Time
 	ObservedBefore time.Time
 	Statuses       []string
-	Limit          int
-	Cursor         *Cursor
+
+	// Affiliations applies only to Entity (entity.affiliation column).
+	Affiliations []string
+
+	// FK filters (per-type — see comment above).
+	EntityID       string // event.entity_id, recommendation.subject_entity_id
+	UnitID         string // event.unit_id, mission.assigned_unit_id, tasking_order.unit_id
+	ObjectiveID    string // plan.objective_id, recommendation.objective_id
+	PlanID         string // mission.plan_id
+	MissionID      string // tasking_order.mission_id
+	TargetEntityID string // mission_objective.target_entity_id, mission.target_entity_id
+	SubjectEventID string // recommendation.subject_event_id
+
+	Limit  int
+	Cursor *Cursor
 }
 
 // Cursor is the keyset position for read pagination. Ordered by
@@ -144,6 +163,86 @@ func (q *queryBuilder) applyCommonFilters(f Filter, hasSubtype bool, hasSource b
 	}
 }
 
+// applyEntitySpecific appends entity-only filters (affiliation).
+func (q *queryBuilder) applyEntitySpecific(f Filter) {
+	if len(f.Affiliations) > 0 {
+		q.writef(" AND affiliation IN (")
+		for i, s := range f.Affiliations {
+			if i > 0 {
+				q.sb.WriteString(",")
+			}
+			q.writef("%s", q.bind(s))
+		}
+		q.sb.WriteString(")")
+	}
+}
+
+// applyFKEvent appends event-specific FK filters (entity_id, unit_id).
+// Called by WhereEvent only — schema columns are bloom-filter indexed so
+// the query stays cheap even on a hot ingest.
+func (q *queryBuilder) applyFKEvent(f Filter) {
+	if f.EntityID != "" {
+		q.writef(" AND entity_id = %s", q.bind(f.EntityID))
+	}
+	if f.UnitID != "" {
+		q.writef(" AND unit_id = %s", q.bind(f.UnitID))
+	}
+}
+
+// applyFKRecommendation appends recommendation-specific FK filters
+// (subject_entity_id ← EntityID, subject_event_id, objective_id).
+func (q *queryBuilder) applyFKRecommendation(f Filter) {
+	if f.EntityID != "" {
+		q.writef(" AND subject_entity_id = %s", q.bind(f.EntityID))
+	}
+	if f.SubjectEventID != "" {
+		q.writef(" AND subject_event_id = %s", q.bind(f.SubjectEventID))
+	}
+	if f.ObjectiveID != "" {
+		q.writef(" AND objective_id = %s", q.bind(f.ObjectiveID))
+	}
+}
+
+// applyFKPlan appends plan-specific FK filters (objective_id).
+func (q *queryBuilder) applyFKPlan(f Filter) {
+	if f.ObjectiveID != "" {
+		q.writef(" AND objective_id = %s", q.bind(f.ObjectiveID))
+	}
+}
+
+// applyFKMission appends mission-specific FK filters (plan_id,
+// assigned_unit_id ← UnitID, target_entity_id).
+func (q *queryBuilder) applyFKMission(f Filter) {
+	if f.PlanID != "" {
+		q.writef(" AND plan_id = %s", q.bind(f.PlanID))
+	}
+	if f.UnitID != "" {
+		q.writef(" AND assigned_unit_id = %s", q.bind(f.UnitID))
+	}
+	if f.TargetEntityID != "" {
+		q.writef(" AND target_entity_id = %s", q.bind(f.TargetEntityID))
+	}
+}
+
+// applyFKMissionObjective appends mission-objective-specific FK filters
+// (target_entity_id).
+func (q *queryBuilder) applyFKMissionObjective(f Filter) {
+	if f.TargetEntityID != "" {
+		q.writef(" AND target_entity_id = %s", q.bind(f.TargetEntityID))
+	}
+}
+
+// applyFKTaskingOrder appends tasking-order-specific FK filters (mission_id,
+// unit_id).
+func (q *queryBuilder) applyFKTaskingOrder(f Filter) {
+	if f.MissionID != "" {
+		q.writef(" AND mission_id = %s", q.bind(f.MissionID))
+	}
+	if f.UnitID != "" {
+		q.writef(" AND unit_id = %s", q.bind(f.UnitID))
+	}
+}
+
 func (q *queryBuilder) applyCursor(c *Cursor) {
 	if c == nil {
 		return
@@ -177,6 +276,7 @@ func (s *Store) WhereEntity(ctx context.Context, f Filter) (Page[*Entity], error
 	limit := clampLimit(f.Limit)
 	q := &queryBuilder{}
 	q.writef("SELECT %s FROM entity FINAL WHERE 1=1", entityCols)
+	q.applyEntitySpecific(f)
 	q.applyCommonFilters(f, true, true, true, false, true)
 	q.applyCursor(f.Cursor)
 	q.applyOrderAndLimit(limit)
@@ -217,6 +317,7 @@ func (s *Store) WhereEvent(ctx context.Context, f Filter) (Page[*Event], error) 
 	q := &queryBuilder{}
 	q.writef("SELECT %s FROM event FINAL WHERE 1=1", eventCols)
 	q.applyCommonFilters(f, true, true, false, false, true)
+	q.applyFKEvent(f)
 	q.applyCursor(f.Cursor)
 	q.applyOrderAndLimit(limit)
 
@@ -325,6 +426,7 @@ func (s *Store) WhereRecommendation(ctx context.Context, f Filter) (Page[*Recomm
 	q := &queryBuilder{}
 	q.writef("SELECT %s FROM recommendation FINAL WHERE 1=1", recommendationCols)
 	q.applyCommonFilters(f, false, true, false, true, false)
+	q.applyFKRecommendation(f)
 	q.applyCursor(f.Cursor)
 	q.applyOrderAndLimit(limit)
 
@@ -361,6 +463,7 @@ func (s *Store) WhereMissionObjective(ctx context.Context, f Filter) (Page[*Miss
 	q := &queryBuilder{}
 	q.writef("SELECT %s FROM mission_objective FINAL WHERE 1=1", missionObjectiveCols)
 	q.applyCommonFilters(f, false, true, false, true, false)
+	q.applyFKMissionObjective(f)
 	q.applyCursor(f.Cursor)
 	q.applyOrderAndLimit(limit)
 
@@ -406,6 +509,7 @@ func (s *Store) WherePlan(ctx context.Context, f Filter) (Page[*Plan], error) {
 	q := &queryBuilder{}
 	q.writef("SELECT %s FROM plan FINAL WHERE 1=1", planCols)
 	q.applyCommonFilters(f, false, true, false, true, false)
+	q.applyFKPlan(f)
 	q.applyCursor(f.Cursor)
 	q.applyOrderAndLimit(limit)
 
@@ -442,6 +546,7 @@ func (s *Store) WhereMission(ctx context.Context, f Filter) (Page[*Mission], err
 	q := &queryBuilder{}
 	q.writef("SELECT %s FROM mission FINAL WHERE 1=1", missionCols)
 	q.applyCommonFilters(f, false, true, false, true, false)
+	q.applyFKMission(f)
 	q.applyCursor(f.Cursor)
 	q.applyOrderAndLimit(limit)
 
@@ -487,6 +592,7 @@ func (s *Store) WhereTaskingOrder(ctx context.Context, f Filter) (Page[*TaskingO
 	q := &queryBuilder{}
 	q.writef("SELECT %s FROM tasking_order FINAL WHERE 1=1", taskingOrderCols)
 	q.applyCommonFilters(f, false, true, false, true, false)
+	q.applyFKTaskingOrder(f)
 	q.applyCursor(f.Cursor)
 	q.applyOrderAndLimit(limit)
 

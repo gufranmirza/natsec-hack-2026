@@ -239,12 +239,27 @@ func objectHandle(t ontology.ObjectType, obj any) map[string]any {
 }
 
 // parseFilter pulls the locked v1 query parameters into an ontology.Filter.
+//
+// FK params (entity_id, unit_id, objective_id, plan_id, mission_id,
+// target_entity_id, subject_event_id) are per-Object-Type — they only have
+// effect when the URL :type has a column with that name (e.g.,
+// ?entity_id=… on Event filters event.entity_id; on Recommendation it
+// filters subject_entity_id; on Entity it is a no-op). See Filter docs
+// for the per-type mapping.
 func parseFilter(r *http.Request) (ontology.Filter, error) {
 	q := r.URL.Query()
 	f := ontology.Filter{
-		Subtypes: q["subtype"],
-		Sources:  q["source"],
-		Statuses: q["status"],
+		Subtypes:       q["subtype"],
+		Sources:        q["source"],
+		Statuses:       q["status"],
+		Affiliations:   q["affiliation"],
+		EntityID:       q.Get("entity_id"),
+		UnitID:         q.Get("unit_id"),
+		ObjectiveID:    q.Get("objective_id"),
+		PlanID:         q.Get("plan_id"),
+		MissionID:      q.Get("mission_id"),
+		TargetEntityID: q.Get("target_entity_id"),
+		SubjectEventID: q.Get("subject_event_id"),
 	}
 	f.SourceRef = q.Get("source_ref")
 

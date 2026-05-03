@@ -29,6 +29,11 @@ var allDDLs = []ddl{
 	{name: "tasking_order", stmt: ddlTaskingOrder},
 	{name: "link_entity_observed_by_unit", stmt: ddlLinkEntityObservedByUnit},
 	{name: "link_report_references_entity", stmt: ddlLinkReportReferencesEntity},
+
+	// In-place column adds for tables created before the column existed.
+	// Safe to run on fresh tables (CREATE TABLE above already includes
+	// the column) — ALTER ... ADD COLUMN IF NOT EXISTS is idempotent.
+	{name: "entity.affiliation", stmt: ddlEntityAffiliationAlter},
 }
 
 // Migrate applies all CREATE TABLE statements. Idempotent; safe to run on
@@ -67,13 +72,22 @@ CREATE TABLE IF NOT EXISTS entity (
     course_deg       Nullable(Float64),
     confidence       Float32,
     threat_level     LowCardinality(String),
+    affiliation      LowCardinality(String) DEFAULT '',
     attributes       Map(LowCardinality(String), String),
-    INDEX idx_lat       lat           TYPE minmax  GRANULARITY 4,
-    INDEX idx_lon       lon           TYPE minmax  GRANULARITY 4,
-    INDEX idx_observed  _observed_at  TYPE minmax  GRANULARITY 4,
-    INDEX idx_subtype   _subtype      TYPE set(64) GRANULARITY 4
+    INDEX idx_lat         lat           TYPE minmax  GRANULARITY 4,
+    INDEX idx_lon         lon           TYPE minmax  GRANULARITY 4,
+    INDEX idx_observed    _observed_at  TYPE minmax  GRANULARITY 4,
+    INDEX idx_subtype     _subtype      TYPE set(64) GRANULARITY 4,
+    INDEX idx_affiliation affiliation   TYPE set(8)  GRANULARITY 4
 ) ENGINE = ReplacingMergeTree(_version)
 ORDER BY _id
+`
+
+// ddlEntityAffiliationAlter back-fills the affiliation column on existing
+// entity tables that were created before the column was added. Idempotent
+// via IF NOT EXISTS. Drop this once all envs have been migrated.
+const ddlEntityAffiliationAlter = `
+ALTER TABLE entity ADD COLUMN IF NOT EXISTS affiliation LowCardinality(String) DEFAULT ''
 `
 
 const ddlEvent = `

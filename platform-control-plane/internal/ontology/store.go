@@ -69,7 +69,7 @@ func notFound(err error) error {
 
 const entityCols = `_id, _version, _observed_at, _ingested_at, _source, _source_ref, _subtype,
 		name, lat, lon, altitude_m, heading_deg, speed_mps, course_deg,
-		confidence, threat_level, attributes`
+		confidence, threat_level, affiliation, attributes`
 
 // GetEntity returns the latest Entity by id, or ErrNotFound.
 func (s *Store) GetEntity(ctx context.Context, id string) (*Entity, error) {
@@ -96,7 +96,7 @@ func (s *Store) UpsertEntity(ctx context.Context, e *Entity) error {
 	if err := batch.Append(
 		e.ID, e.Version, e.ObservedAt, e.IngestedAt, e.Source, e.SourceRef, e.Subtype,
 		e.Name, e.Lat, e.Lon, e.AltitudeM, e.HeadingDeg, e.SpeedMps, e.CourseDeg,
-		e.Confidence, e.ThreatLevel, e.Attributes,
+		e.Confidence, e.ThreatLevel, e.Affiliation, e.Attributes,
 	); err != nil {
 		_ = batch.Abort()
 		return fmt.Errorf("append entity: %w", err)

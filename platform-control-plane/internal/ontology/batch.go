@@ -20,7 +20,7 @@ func (s *Store) UpsertEntityBatch(ctx context.Context, rows []*Entity) error {
 		if err := batch.Append(
 			e.ID, e.Version, e.ObservedAt, e.IngestedAt, e.Source, e.SourceRef, e.Subtype,
 			e.Name, e.Lat, e.Lon, e.AltitudeM, e.HeadingDeg, e.SpeedMps, e.CourseDeg,
-			e.Confidence, e.ThreatLevel, e.Attributes,
+			e.Confidence, e.ThreatLevel, e.Affiliation, e.Attributes,
 		); err != nil {
 			_ = batch.Abort()
 			return fmt.Errorf("append entity row %s: %w", e.ID, err)
