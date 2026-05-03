@@ -289,14 +289,14 @@ function cannedReply(input: string): string {
   ) {
     return 'Acknowledged. Drafting tasking for ROOK-1 to intercept BOGEY-7. Stand-off 600m. Awaiting your approval in the recommendations panel.';
   }
-  if (t.includes('v-117') || t.includes('vessel') || t.includes('ship')) {
+  if (t.includes('v-117') || t.includes('vehicle') || t.includes('convoy')) {
     return 'Re-tasking ROOK-2 for visual confirmation of V-117. ETA on-station 6m 18s.';
   }
   if (t.includes('p-04') || t.includes('person') || t.includes('ground')) {
     return 'Hand-off cued to BRAVO-3 for ground confirmation. Bearing 311°, 1.2 NM.';
   }
   if (t.includes('what') || t.includes('?') || t.includes('status')) {
-    return 'Current picture: 1 hostile (BOGEY-7), 1 unknown vessel (V-117), 1 person of interest (P-04). 2 friendly drones (ROOK-1, ROOK-2). 1 ground unit (BRAVO-3). See map for live state.';
+    return 'Current picture: 1 hostile (BOGEY-7), 1 unknown vehicle track (V-117), 1 person of interest (P-04). 2 friendly drones (ROOK-1, ROOK-2). 1 ground unit (BRAVO-3). See map for live state.';
   }
   return 'Acknowledged. Holding for further input.';
 }

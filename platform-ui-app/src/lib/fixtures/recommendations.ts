@@ -46,7 +46,7 @@ export const RECOMMENDATIONS: Recommendation[] = [
       objective: 'visual_confirmation',
     },
     rationale:
-      'Vessel deviated 12° from filed course. AIS gap during deviation. OFAC partial registry match against the flag.',
+      'Vehicle deviated 12° from covered route. Satellite track gap during deviation. Pattern matches prior logistics probes near the line of contact.',
     confidence: 0.64,
     evidence_refs: ['evt_003', 'evt_001'],
     status: 'pending',
@@ -55,7 +55,7 @@ export const RECOMMENDATIONS: Recommendation[] = [
     short: 'ROOK-2 for visual confirmation of V-117.',
     asset_callsign: 'ROOK-2',
     eta: 'On-station in 6m 18s',
-    why: ['Course deviation', 'OFAC partial match'],
+    why: ['Course deviation', 'Sat-track gap'],
   },
   {
     _type: 'Recommendation',
@@ -81,7 +81,7 @@ export const RECOMMENDATIONS: Recommendation[] = [
     verb: 'Hand-off',
     short: 'P-04 cue to ground unit BRAVO-3.',
     asset_callsign: 'BRAVO-3',
-    eta: 'Bearing 311° · 1.2 NM',
+    eta: 'Bearing 311° · 1.2 km',
     why: ['Single radio report'],
   },
 ];

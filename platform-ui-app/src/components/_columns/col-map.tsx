@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from 'react';
 
+import deepStateOccupied from '@/lib/fixtures/deepstate-occupied-20260502.json';
 import type { AnyObject, Entity, LatLon, Unit } from '@/types/ontology';
-import { latLonToSvg, MAP_VIEWBOX } from '@/types/ontology';
+import { MAP_VIEWBOX } from '@/types/ontology';
 
 interface ColMapProps {
   entities: Entity[];
@@ -12,45 +13,97 @@ interface ColMapProps {
   onSelect: (o: AnyObject) => void;
 }
 
-const MAP_CENTER: LatLon = [38.71, 23.5];
+type Tile = {
+  key: string;
+  src: string;
+  style: {
+    left: string;
+    top: string;
+    width: string;
+    height: string;
+  };
+};
+
+type GeoJsonPosition = [number, number];
+type GeoJsonRing = GeoJsonPosition[];
+type GeoJsonPolygon = GeoJsonRing[];
+type GeoJsonMultiPolygon = GeoJsonPolygon[];
+type DeepStateGeometry =
+  | { type: 'Polygon'; coordinates: GeoJsonPolygon }
+  | { type: 'MultiPolygon'; coordinates: GeoJsonMultiPolygon };
+type DeepStateFeatureCollection = {
+  name?: string;
+  features: Array<{ geometry: DeepStateGeometry }>;
+};
+
 const TILE_HOSTS = ['a', 'b', 'c', 'd'] as const;
-const MIN_ZOOM = 8;
-const MAX_ZOOM = 11;
+const MIN_ZOOM = 6;
+const MAX_ZOOM = 8;
+const DEFAULT_ZOOM = 7;
+const TILE_SIZE = 256;
+
+const MAP_BOUNDS = {
+  latMin: 44.25,
+  latMax: 52.12,
+  lonMin: 31.1,
+  lonMax: 40.65,
+} as const;
+
+const DEEPSTATE_DATE = '2026-05-02';
+const DEEPSTATE_NAME =
+  (deepStateOccupied as unknown as DeepStateFeatureCollection).name ??
+  'deepstatemap_data_20260502';
 
 const ENGLISH_LABELS = [
-  { label: 'Euboea', position: [38.74, 23.48] as LatLon, kind: 'region' },
-  { label: 'Chalcis', position: [38.46, 23.59] as LatLon, kind: 'town' },
-  { label: 'Aliveri', position: [38.42, 23.72] as LatLon, kind: 'town' },
+  { label: 'Kharkiv', position: [49.99, 36.23] as LatLon, kind: 'city' },
+  { label: 'Sloviansk', position: [48.86, 37.61] as LatLon, kind: 'city' },
+  { label: 'Kramatorsk', position: [48.74, 37.58] as LatLon, kind: 'city' },
+  { label: 'Bakhmut', position: [48.59, 38.0] as LatLon, kind: 'city' },
+  { label: 'Donetsk', position: [48.0, 37.8] as LatLon, kind: 'city' },
+  { label: 'Mariupol', position: [47.1, 37.55] as LatLon, kind: 'city' },
+  { label: 'Dnipro', position: [48.46, 35.05] as LatLon, kind: 'city' },
   {
-    label: 'Skyros Strait',
-    position: [38.78, 23.78] as LatLon,
-    kind: 'water',
+    label: 'Zaporizhzhia',
+    position: [47.84, 35.14] as LatLon,
+    kind: 'city',
   },
+  { label: 'Crimea', position: [45.25, 34.2] as LatLon, kind: 'region' },
   {
-    label: 'Aegean Sea',
-    position: [38.9, 23.34] as LatLon,
+    label: 'Sea of Azov',
+    position: [46.4, 37.05] as LatLon,
     kind: 'water',
   },
 ];
 
 const ROUTE: LatLon[] = [
-  [38.55, 23.2],
-  [38.6, 23.33],
-  [38.68, 23.45],
-  [38.78, 23.55],
-  [38.85, 23.62],
+  [48.67, 37.35],
+  [48.7, 37.52],
+  [48.72, 37.62],
+  [48.75, 37.78],
+  [48.78, 37.9],
 ];
 
+const MARKER_OFFSETS: Record<string, { x: number; y: number }> = {
+  'ROOK-1': { x: -154, y: -42 },
+  'ROOK-2': { x: 28, y: 26 },
+  'BRAVO-3': { x: -150, y: 22 },
+  'BOGEY-7': { x: 34, y: -58 },
+  'V-117': { x: 42, y: 68 },
+  'P-04': { x: -16, y: 2 },
+};
+
 export function ColMap({ entities, units, selectedId, onSelect }: ColMapProps) {
-  const [zoom, setZoom] = useState(9);
+  const [zoom, setZoom] = useState(DEFAULT_ZOOM);
   const tiles = useMemo(() => buildTiles(zoom), [zoom]);
+  const occupiedPaths = useMemo(() => buildDeepStatePaths(), []);
 
   return (
     <section className="relative h-full overflow-hidden bg-[hsl(220_12%_84%)]">
       <TileMosaic tiles={tiles} />
 
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(transparent_0,transparent_23px,hsl(220_20%_10%/0.06)_24px),linear-gradient(90deg,transparent_0,transparent_23px,hsl(220_20%_10%/0.05)_24px)] bg-[length:24px_24px]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(transparent_0,transparent_23px,hsl(220_20%_10%/0.065)_24px),linear-gradient(90deg,transparent_0,transparent_23px,hsl(220_20%_10%/0.055)_24px)] bg-[length:24px_24px]" />
 
+      <DeepStateLayer paths={occupiedPaths} />
       <MissionVectors entities={entities} units={units} />
       <EnglishLabels />
       <MissionMarkers
@@ -60,29 +113,38 @@ export function ColMap({ entities, units, selectedId, onSelect }: ColMapProps) {
         onSelect={onSelect}
       />
 
-      <div className="border-border bg-card/95 absolute left-3 top-3 z-30 w-[244px] border px-3 py-2 backdrop-blur">
-        <div className="label-cap-sm text-muted-foreground">Open map layer</div>
+      <div className="border-border bg-card/95 absolute left-3 top-3 z-30 w-[256px] border px-3 py-2 backdrop-blur">
+        <div className="label-cap-sm text-muted-foreground">
+          Operational map
+        </div>
         <div className="text-foreground mt-0.5 font-mono text-[11px] font-semibold">
-          CARTO raster / English overlay
+          DeepState occupied terrain
         </div>
         <div className="border-border mt-2 grid grid-cols-3 border-t pt-2">
-          <MapMetric label="Labels" value="EN" />
-          <MapMetric label="Grid" value="UTM 35S" />
+          <MapMetric label="Source" value="DeepState" />
+          <MapMetric label="Date" value={DEEPSTATE_DATE} />
           <MapMetric label="Zoom" value={`Z${zoom}`} />
         </div>
       </div>
 
-      <div className="border-border bg-card/95 absolute right-3 top-3 z-30 w-[228px] border px-3 py-2 backdrop-blur">
+      <div className="border-border bg-card/95 absolute right-3 top-3 z-30 w-[236px] border px-3 py-2 backdrop-blur">
         <div className="mb-1.5 flex items-center justify-between gap-2">
           <span className="label-cap-sm text-muted-foreground">Layers</span>
           <span className="text-success font-mono text-[10px]">local</span>
         </div>
         <div className="grid gap-1 font-mono text-[10px]">
-          <LayerRow label="English basemap tiles" tone="muted" />
+          <LayerRow label="DeepState GeoJSON" tone="threat" />
+          <LayerRow label="CARTO English tiles" tone="muted" />
           <LayerRow label="OSINT geotag cue" tone="warning" />
           <LayerRow label="Friendly telemetry" tone="friendly" />
-          <LayerRow label="Contact tracks" tone="threat" />
           <LayerRow label="RF search area" tone="warning" />
+        </div>
+      </div>
+
+      <div className="border-border bg-card/95 absolute bottom-3 left-3 z-30 max-w-[275px] border px-3 py-2 backdrop-blur">
+        <div className="label-cap-sm text-muted-foreground">Dataset</div>
+        <div className="text-muted-foreground mt-0.5 truncate font-mono text-[9px]">
+          {DEEPSTATE_NAME} · latest daily fixture
         </div>
       </div>
 
@@ -108,24 +170,71 @@ export function ColMap({ entities, units, selectedId, onSelect }: ColMapProps) {
   );
 }
 
-function TileMosaic({
-  tiles,
-}: {
-  tiles: Array<{ key: string; src: string; alt: string }>;
-}) {
+function TileMosaic({ tiles }: { tiles: Tile[] }) {
   return (
-    <div className="contrast-110 absolute inset-[-22%] grid grid-cols-5 opacity-85 saturate-50">
+    <div className="absolute inset-0 opacity-80">
       {tiles.map((tile) => (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           key={tile.key}
           src={tile.src}
-          alt={tile.alt}
-          className="size-full object-cover"
+          alt=""
+          className="absolute object-cover"
+          style={tile.style}
           draggable={false}
         />
       ))}
     </div>
+  );
+}
+
+function DeepStateLayer({ paths }: { paths: string[] }) {
+  return (
+    <svg
+      className="pointer-events-none absolute inset-0 z-10 size-full"
+      viewBox={`0 0 ${MAP_VIEWBOX.w} ${MAP_VIEWBOX.h}`}
+      preserveAspectRatio="none"
+      aria-hidden
+    >
+      <defs>
+        <pattern
+          id="deepstate-hatch"
+          patternUnits="userSpaceOnUse"
+          width="14"
+          height="14"
+          patternTransform="rotate(45)"
+        >
+          <line
+            x1="0"
+            y1="0"
+            x2="0"
+            y2="14"
+            stroke="hsl(var(--threat) / 0.34)"
+            strokeWidth="4"
+          />
+        </pattern>
+      </defs>
+      {paths.map((path, index) => (
+        <path
+          key={`occupied-${index}`}
+          d={path}
+          fill="url(#deepstate-hatch)"
+          fillRule="evenodd"
+          stroke="hsl(var(--threat))"
+          strokeLinejoin="round"
+          strokeWidth="2.4"
+          opacity="0.82"
+        />
+      ))}
+      {paths.map((path, index) => (
+        <path
+          key={`occupied-fill-${index}`}
+          d={path}
+          fill="hsl(var(--threat) / 0.13)"
+          fillRule="evenodd"
+        />
+      ))}
+    </svg>
   );
 }
 
@@ -137,11 +246,11 @@ function MissionVectors({
   units: Unit[];
 }) {
   const routePath = toPath(ROUTE);
-  const rf = latLonToSvg([38.85, 23.62]);
+  const rf = projectToSvg([48.78, 37.9]);
 
   return (
     <svg
-      className="pointer-events-none absolute inset-0 z-10 size-full"
+      className="pointer-events-none absolute inset-0 z-20 size-full"
       viewBox={`0 0 ${MAP_VIEWBOX.w} ${MAP_VIEWBOX.h}`}
       preserveAspectRatio="none"
       aria-hidden
@@ -152,7 +261,7 @@ function MissionVectors({
         stroke="hsl(var(--background))"
         strokeWidth="16"
         strokeLinecap="square"
-        opacity="0.85"
+        opacity="0.88"
       />
       <path
         d={routePath}
@@ -165,8 +274,8 @@ function MissionVectors({
       <ellipse
         cx={rf.x}
         cy={rf.y}
-        rx="92"
-        ry="70"
+        rx="78"
+        ry="56"
         fill="hsl(var(--warning) / 0.15)"
         stroke="hsl(var(--warning))"
         strokeWidth="3"
@@ -180,11 +289,11 @@ function MissionVectors({
 }
 
 function TrackLine({ object }: { object: Entity | Unit }) {
-  const point = latLonToSvg(object.position);
+  const point = projectToSvg(object.position);
   const isFriendly =
     object._type === 'Unit' || object.affiliation === 'friendly';
-  const dx = isFriendly ? -62 : -78;
-  const dy = isFriendly ? 36 : -46;
+  const dx = isFriendly ? -56 : -72;
+  const dy = isFriendly ? 32 : -42;
 
   return (
     <path
@@ -193,7 +302,7 @@ function TrackLine({ object }: { object: Entity | Unit }) {
       stroke={isFriendly ? 'hsl(var(--friendly))' : 'hsl(var(--threat))'}
       strokeWidth="4"
       strokeDasharray="9 8"
-      opacity="0.7"
+      opacity="0.78"
     />
   );
 }
@@ -211,7 +320,7 @@ function EnglishLabels() {
               label.kind === 'water'
                 ? 'text-[10px] uppercase tracking-[0.12em] text-[hsl(211_20%_38%)]'
                 : label.kind === 'region'
-                  ? 'text-[12px] font-semibold text-[hsl(220_15%_20%)]'
+                  ? 'text-[12px] font-semibold uppercase tracking-[0.08em] text-[hsl(220_15%_20%)]'
                   : 'text-[10px] font-semibold text-[hsl(220_12%_18%)]',
             ].join(' ')}
             style={style}
@@ -285,7 +394,7 @@ function MarkerButton({
       type="button"
       onClick={onClick}
       className={[
-        'absolute flex max-w-[148px] translate-x-2 translate-y-[-12px] items-center gap-2 border bg-[hsl(220_18%_8%/0.92)] px-2 py-1 text-left shadow-none backdrop-blur transition-transform hover:scale-[1.02]',
+        'absolute flex max-w-[148px] items-center gap-2 border bg-[hsl(220_18%_8%/0.92)] px-2 py-1 text-left shadow-none backdrop-blur transition-transform hover:scale-[1.02]',
         selected ? 'ring-primary ring-1' : '',
         tone === 'friendly'
           ? 'border-friendly text-friendly'
@@ -293,7 +402,11 @@ function MarkerButton({
             ? 'border-threat text-threat'
             : 'border-warning text-warning',
       ].join(' ')}
-      style={positionStyle(position)}
+      style={{
+        ...positionStyle(position),
+        marginLeft: `${MARKER_OFFSETS[label]?.x ?? 8}px`,
+        marginTop: `${MARKER_OFFSETS[label]?.y ?? -12}px`,
+      }}
       aria-label={label}
     >
       <span className="block size-2 shrink-0 bg-current" />
@@ -309,38 +422,85 @@ function MarkerButton({
   );
 }
 
-function buildTiles(zoom: number) {
-  const center = latLonToTile(MAP_CENTER, zoom);
-  const offsets = [-2, -1, 0, 1, 2];
+function buildTiles(zoom: number): Tile[] {
+  const topLeft = webMercator([MAP_BOUNDS.latMax, MAP_BOUNDS.lonMin], zoom);
+  const bottomRight = webMercator([MAP_BOUNDS.latMin, MAP_BOUNDS.lonMax], zoom);
+  const width = bottomRight.x - topLeft.x;
+  const height = bottomRight.y - topLeft.y;
+  const xMin = Math.floor(topLeft.x / TILE_SIZE);
+  const xMax = Math.floor(bottomRight.x / TILE_SIZE);
+  const yMin = Math.floor(topLeft.y / TILE_SIZE);
+  const yMax = Math.floor(bottomRight.y / TILE_SIZE);
+  const tiles: Tile[] = [];
 
-  return offsets.flatMap((dy) =>
-    offsets.map((dx) => {
-      const x = center.x + dx;
-      const y = center.y + dy;
+  for (let y = yMin; y <= yMax; y += 1) {
+    for (let x = xMin; x <= xMax; x += 1) {
       const host = TILE_HOSTS[Math.abs(x + y) % TILE_HOSTS.length];
-      return {
+      tiles.push({
         key: `${zoom}-${x}-${y}`,
         src: `https://${host}.basemaps.cartocdn.com/light_nolabels/${zoom}/${x}/${y}@2x.png`,
-        alt: '',
-      };
-    })
-  );
+        style: {
+          left: `${((x * TILE_SIZE - topLeft.x) / width) * 100}%`,
+          top: `${((y * TILE_SIZE - topLeft.y) / height) * 100}%`,
+          width: `${(TILE_SIZE / width) * 100}%`,
+          height: `${(TILE_SIZE / height) * 100}%`,
+        },
+      });
+    }
+  }
+
+  return tiles;
 }
 
-function latLonToTile([lat, lon]: LatLon, zoom: number) {
-  const latRad = (lat * Math.PI) / 180;
-  const scale = 2 ** zoom;
-  const x = Math.floor(((lon + 180) / 360) * scale);
-  const y = Math.floor(
-    ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) *
-      scale
-  );
+function buildDeepStatePaths() {
+  const collection = deepStateOccupied as unknown as DeepStateFeatureCollection;
 
-  return { x, y };
+  return collection.features.flatMap((feature) => {
+    if (feature.geometry.type === 'Polygon') {
+      return [polygonToPath(feature.geometry.coordinates)];
+    }
+
+    return feature.geometry.coordinates.map(polygonToPath);
+  });
+}
+
+function polygonToPath(polygon: GeoJsonPolygon) {
+  return polygon
+    .map((ring) =>
+      ring
+        .map(([lon, lat], index) => {
+          const point = projectToSvg([lat, lon]);
+          return `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`;
+        })
+        .join(' ')
+        .concat(' Z')
+    )
+    .join(' ');
+}
+
+function webMercator([lat, lon]: LatLon, zoom: number) {
+  const sin = Math.sin((lat * Math.PI) / 180);
+  const scale = TILE_SIZE * 2 ** zoom;
+
+  return {
+    x: ((lon + 180) / 360) * scale,
+    y: (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * scale,
+  };
+}
+
+function projectToSvg(position: LatLon) {
+  const topLeft = webMercator([MAP_BOUNDS.latMax, MAP_BOUNDS.lonMin], 8);
+  const bottomRight = webMercator([MAP_BOUNDS.latMin, MAP_BOUNDS.lonMax], 8);
+  const point = webMercator(position, 8);
+
+  return {
+    x: ((point.x - topLeft.x) / (bottomRight.x - topLeft.x)) * MAP_VIEWBOX.w,
+    y: ((point.y - topLeft.y) / (bottomRight.y - topLeft.y)) * MAP_VIEWBOX.h,
+  };
 }
 
 function positionStyle(position: LatLon) {
-  const point = latLonToSvg(position);
+  const point = projectToSvg(position);
   return {
     left: `${(point.x / MAP_VIEWBOX.w) * 100}%`,
     top: `${(point.y / MAP_VIEWBOX.h) * 100}%`,
@@ -350,7 +510,7 @@ function positionStyle(position: LatLon) {
 function toPath(points: LatLon[]) {
   return points
     .map((point, index) => {
-      const { x, y } = latLonToSvg(point);
+      const { x, y } = projectToSvg(point);
       return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
     })
     .join(' ');
