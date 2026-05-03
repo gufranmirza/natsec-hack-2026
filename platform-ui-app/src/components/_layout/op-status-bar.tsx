@@ -1,16 +1,16 @@
 'use client';
 
-// Bloomberg-density operational status bar. Single dense mono row,
-// no logo, no avatar. Pure tabular telemetry — UTC + Zulu, comms,
-// mission ID, sensor count, threat count. Tightly-packed and the
-// only typographic vocabulary is mono + label-cap.
-
 import { Crosshair } from 'lucide-react';
 
+import type { MissionObjective } from '@/types/ontology';
+
 interface OpStatusBarProps {
+  missions: MissionObjective[];
+  activeId: string;
+  onMissionSelect: (id: string) => void;
   missionId: string;
-  utcTime: string; // "14:23:47Z"
-  missionElapsed: string; // "T+02:14:09"
+  utcTime: string;
+  missionElapsed: string;
   commsLatencyMs: number;
   edgeState: 'synced' | 'degraded' | 'severed';
   sensorCount: number;
@@ -20,6 +20,9 @@ interface OpStatusBarProps {
 
 export function OpStatusBar(props: OpStatusBarProps) {
   const {
+    missions,
+    activeId,
+    onMissionSelect,
     missionId,
     utcTime,
     missionElapsed,
@@ -30,68 +33,75 @@ export function OpStatusBar(props: OpStatusBarProps) {
     unitCount,
   } = props;
 
-  const edgeColor =
+  const edgeTone =
     edgeState === 'synced'
       ? 'text-success'
       : edgeState === 'degraded'
         ? 'text-warning'
         : 'text-threat';
 
-  const edgeDot =
-    edgeState === 'synced'
-      ? 'bg-success'
-      : edgeState === 'degraded'
-        ? 'bg-warning'
-        : 'bg-threat';
-
   return (
-    <header className="border-border bg-background relative z-30 flex h-9 shrink-0 items-stretch border-b">
-      {/* Brand corner notch — minimal, monogram + version. */}
-      <div className="border-border flex w-[200px] items-center gap-2 border-r px-3">
+    <header className="border-border bg-background relative z-30 flex h-10 shrink-0 items-stretch border-b">
+      <div className="border-border flex w-[168px] shrink-0 items-center gap-2 border-r px-2.5">
         <div
           aria-hidden
-          className="bg-primary text-primary-foreground grid size-5 place-items-center rounded-[1px]"
+          className="bg-foreground text-background grid size-5 place-items-center"
         >
           <Crosshair className="size-3" strokeWidth={2.4} />
         </div>
-        <span className="label-cap text-foreground/80">
-          Mission&nbsp;Commander
-        </span>
-        <span className="text-muted-foreground/50 font-mono text-[10px]">
-          v0
-        </span>
+        <div className="min-w-0">
+          <div className="text-foreground font-mono text-[11px] font-bold leading-none">
+            EDGE C2
+          </div>
+          <div className="text-muted-foreground mt-0.5 font-mono text-[9px] leading-none">
+            ISR TASKING
+          </div>
+        </div>
       </div>
 
-      {/* Status rail — left to right, dense, mono. */}
-      <div className="divide-border flex flex-1 items-center divide-x">
-        <Cell label="Op" value={missionId} mono />
-        <Cell label="UTC" value={utcTime} mono />
-        <Cell label="Elapsed" value={missionElapsed} mono />
-        <Cell label="Lat" value="38.71°N" mono />
-        <Cell label="Lon" value="23.50°E" mono />
+      <nav
+        aria-label="Mission workspaces"
+        className="border-border flex w-[390px] shrink-0 items-stretch border-r"
+      >
+        {missions.slice(0, 3).map((mission) => {
+          const active = mission._id === activeId;
+          return (
+            <button
+              key={mission._id}
+              type="button"
+              onClick={() => onMissionSelect(mission._id)}
+              className={[
+                'border-border flex min-w-0 flex-1 items-center justify-center border-r px-2 text-center transition-colors last:border-r-0',
+                active
+                  ? 'bg-foreground text-background'
+                  : 'bg-muted/40 text-muted-foreground hover:bg-secondary hover:text-foreground',
+              ].join(' ')}
+            >
+              <span className="truncate font-mono text-[10px] font-semibold">
+                {mission._source_ref ?? mission.title}
+              </span>
+            </button>
+          );
+        })}
+      </nav>
+
+      <div className="divide-border grid min-w-0 flex-1 grid-cols-8 divide-x">
+        <Cell label="Op" value={missionId} />
+        <Cell label="UTC" value={utcTime} />
+        <Cell label="Elapsed" value={missionElapsed} />
         <Cell
           label="Edge"
           value={edgeState.toUpperCase()}
-          mono
-          dot={edgeDot}
-          valueClass={edgeColor}
+          valueClass={edgeTone}
         />
-        <Cell label="Comms" value={`${commsLatencyMs}ms`} mono />
-        <Cell label="Units" value={`${unitCount}`} mono />
+        <Cell label="Comms" value={`${commsLatencyMs}ms`} />
+        <Cell label="Units" value={`${unitCount}`} />
         <Cell
-          label="Threats"
+          label="Contacts"
           value={`${threatCount}`}
-          mono
-          valueClass={threatCount > 0 ? 'text-threat' : ''}
+          valueClass={threatCount > 0 ? 'text-threat' : undefined}
         />
-        <Cell label="Sensors" value={`${sensorCount}`} mono />
-      </div>
-
-      {/* Right rail — fix nothing more. The status bar IS the chrome. */}
-      <div className="border-border flex items-center border-l px-3">
-        <span className="text-muted-foreground/70 font-mono text-[10px]">
-          ROE&nbsp;<span className="text-foreground/85">P1</span>
-        </span>
+        <Cell label="Feeds" value={`${sensorCount}`} />
       </div>
     </header>
   );
@@ -100,22 +110,19 @@ export function OpStatusBar(props: OpStatusBarProps) {
 function Cell({
   label,
   value,
-  mono,
-  dot,
   valueClass,
 }: {
   label: string;
   value: string;
-  mono?: boolean;
-  dot?: string;
   valueClass?: string;
 }) {
   return (
-    <div className="flex items-center gap-1.5 px-3 py-1">
-      {dot ? <span aria-hidden className={`size-1.5 ${dot}`} /> : null}
-      <span className="text-muted-foreground/70 label-cap-sm">{label}</span>
+    <div className="flex min-w-0 flex-col justify-center px-2">
+      <span className="text-muted-foreground label-cap-sm truncate">
+        {label}
+      </span>
       <span
-        className={`text-foreground ${mono ? 'font-mono text-[11px]' : 'text-[12px]'} ${valueClass ?? ''}`}
+        className={`text-foreground truncate font-mono text-[11px] ${valueClass ?? ''}`}
       >
         {value}
       </span>

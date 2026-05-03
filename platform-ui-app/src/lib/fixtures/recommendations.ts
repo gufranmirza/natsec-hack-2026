@@ -20,14 +20,14 @@ export const RECOMMENDATIONS: Recommendation[] = [
     rationale:
       'Track persistent for 46s. Heading converges with BOGEY-7. Consistent with prior incursion signatures (1.3 nm match in archived RF library).',
     confidence: 0.87,
-    evidence_refs: ['evt_005', 'evt_004', 'rep_002'],
+    evidence_refs: ['evt_005', 'evt_004', 'rep_002', 'rep_003'],
     status: 'pending',
     gating: 'confirm',
     verb: 'Vector',
     short: 'ROOK-1 to intercept BOGEY-7.',
     asset_callsign: 'ROOK-1',
     eta: 'Intercept 4m 02s · fuel margin +18%',
-    why: ['Track persists 46s', 'Heading converges', 'Match vs known sigs'],
+    why: ['Track persists 46s', 'OSINT geotag cue', 'Match vs known sigs'],
   },
   {
     _type: 'Recommendation',
@@ -46,7 +46,7 @@ export const RECOMMENDATIONS: Recommendation[] = [
       objective: 'visual_confirmation',
     },
     rationale:
-      'Vessel deviated 12° from filed course. AIS gap during deviation. OFAC partial registry match against the flag.',
+      'Vehicle deviated 12° from covered route. Satellite track gap during deviation. Pattern matches prior logistics probes near the line of contact.',
     confidence: 0.64,
     evidence_refs: ['evt_003', 'evt_001'],
     status: 'pending',
@@ -55,7 +55,7 @@ export const RECOMMENDATIONS: Recommendation[] = [
     short: 'ROOK-2 for visual confirmation of V-117.',
     asset_callsign: 'ROOK-2',
     eta: 'On-station in 6m 18s',
-    why: ['Course deviation', 'OFAC partial match'],
+    why: ['Course deviation', 'Sat-track gap'],
   },
   {
     _type: 'Recommendation',
@@ -81,7 +81,7 @@ export const RECOMMENDATIONS: Recommendation[] = [
     verb: 'Hand-off',
     short: 'P-04 cue to ground unit BRAVO-3.',
     asset_callsign: 'BRAVO-3',
-    eta: 'Bearing 311° · 1.2 NM',
+    eta: 'Bearing 311° · 1.2 km',
     why: ['Single radio report'],
   },
 ];

@@ -1,20 +1,10 @@
 'use client';
 
-// Column 1 (50%) — the operational picture.
-// Dark, sealed off via .invert-surface. Hand-drawn topographic SVG
-// with MIL-STD-2525 simplified glyphs. Crosshair cursor. Scanlines.
-// Click any entity or unit to open the Object Drawer.
+import { useEffect, useMemo, useState } from 'react';
 
-import { affiliationToken } from '@/components/_ontology/affiliation';
-import { EntityGlyph } from '@/components/_ontology/entity-glyph';
-import {
-  type AnyObject,
-  type Entity,
-  latLonToSvg,
-  MAP_BOUNDS,
-  MAP_VIEWBOX,
-  type Unit,
-} from '@/types/ontology';
+import deepStateOccupied from '@/lib/fixtures/deepstate-occupied-20260502.json';
+import type { AnyObject, Entity, LatLon, Unit } from '@/types/ontology';
+import { MAP_VIEWBOX } from '@/types/ontology';
 
 interface ColMapProps {
   entities: Entity[];
@@ -23,486 +13,574 @@ interface ColMapProps {
   onSelect: (o: AnyObject) => void;
 }
 
+type Tile = {
+  key: string;
+  src: string;
+  style: {
+    left: string;
+    top: string;
+    width: string;
+    height: string;
+  };
+};
+
+type GeoJsonPosition = [number, number];
+type GeoJsonRing = GeoJsonPosition[];
+type GeoJsonPolygon = GeoJsonRing[];
+type GeoJsonMultiPolygon = GeoJsonPolygon[];
+type DeepStateGeometry =
+  | { type: 'Polygon'; coordinates: GeoJsonPolygon }
+  | { type: 'MultiPolygon'; coordinates: GeoJsonMultiPolygon };
+type DeepStateFeatureCollection = {
+  name?: string;
+  features: Array<{ geometry: DeepStateGeometry }>;
+};
+
+const TILE_HOSTS = ['a', 'b', 'c', 'd'] as const;
+const MIN_ZOOM = 6;
+const MAX_ZOOM = 8;
+const DEFAULT_ZOOM = 7;
+const TILE_SIZE = 256;
+
+const MAP_BOUNDS = {
+  latMin: 44.25,
+  latMax: 52.12,
+  lonMin: 31.1,
+  lonMax: 40.65,
+} as const;
+
+const DEEPSTATE_DATE = '2026-05-02';
+const DEEPSTATE_NAME =
+  (deepStateOccupied as unknown as DeepStateFeatureCollection).name ??
+  'deepstatemap_data_20260502';
+
+const ENGLISH_LABELS = [
+  { label: 'Kharkiv', position: [49.99, 36.23] as LatLon, kind: 'city' },
+  { label: 'Sloviansk', position: [48.86, 37.61] as LatLon, kind: 'city' },
+  { label: 'Kramatorsk', position: [48.74, 37.58] as LatLon, kind: 'city' },
+  { label: 'Bakhmut', position: [48.59, 38.0] as LatLon, kind: 'city' },
+  { label: 'Donetsk', position: [48.0, 37.8] as LatLon, kind: 'city' },
+  { label: 'Mariupol', position: [47.1, 37.55] as LatLon, kind: 'city' },
+  { label: 'Dnipro', position: [48.46, 35.05] as LatLon, kind: 'city' },
+  {
+    label: 'Zaporizhzhia',
+    position: [47.84, 35.14] as LatLon,
+    kind: 'city',
+  },
+  { label: 'Crimea', position: [45.25, 34.2] as LatLon, kind: 'region' },
+  {
+    label: 'Sea of Azov',
+    position: [46.4, 37.05] as LatLon,
+    kind: 'water',
+  },
+];
+
+const ROUTE: LatLon[] = [
+  [48.67, 37.35],
+  [48.7, 37.52],
+  [48.72, 37.62],
+  [48.75, 37.78],
+  [48.78, 37.9],
+];
+
+const MARKER_OFFSETS: Record<string, { x: number; y: number }> = {
+  'ROOK-1': { x: -154, y: -42 },
+  'ROOK-2': { x: 28, y: 26 },
+  'BRAVO-3': { x: -150, y: 22 },
+  'BOGEY-7': { x: 34, y: -58 },
+  'V-117': { x: 42, y: 68 },
+  'P-04': { x: -16, y: 2 },
+};
+
 export function ColMap({ entities, units, selectedId, onSelect }: ColMapProps) {
+  const [zoom, setZoom] = useState(DEFAULT_ZOOM);
+  const [keplerStats, setKeplerStats] = useState({
+    rows: 0,
+    fields: 0,
+    status: 'loading' as 'loading' | 'ready' | 'failed',
+  });
+  const tiles = useMemo(() => buildTiles(zoom), [zoom]);
+  const occupiedPaths = useMemo(() => buildDeepStatePaths(), []);
+
+  useEffect(() => {
+    let active = true;
+
+    void import('@kepler.gl/processors/dist/data-processor')
+      .then(({ processGeojson }) => {
+        const dataset = processGeojson(deepStateOccupied);
+        if (!active) return;
+        setKeplerStats({
+          rows: dataset?.rows.length ?? 0,
+          fields: dataset?.fields.length ?? 0,
+          status: 'ready',
+        });
+      })
+      .catch(() => {
+        if (active) {
+          setKeplerStats((current) => ({ ...current, status: 'failed' }));
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
-    <section className="invert-surface relative h-full overflow-hidden">
-      <div className="topo cursor-target relative size-full overflow-hidden">
-        <TacticalMap
-          entities={entities}
-          units={units}
-          selectedId={selectedId}
-          onSelect={onSelect}
-        />
+    <section className="relative h-full overflow-hidden bg-[hsl(220_12%_84%)]">
+      <TileMosaic tiles={tiles} />
 
-        {/* Scanline overlay — sits above the SVG, below the chrome */}
-        <div className="scanline pointer-events-none absolute inset-0 z-[1]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(transparent_0,transparent_23px,hsl(220_20%_10%/0.065)_24px),linear-gradient(90deg,transparent_0,transparent_23px,hsl(220_20%_10%/0.055)_24px)] bg-[length:24px_24px]" />
 
-        {/* Top-left: layer chips */}
-        <div className="absolute left-5 top-5 z-10 flex flex-col gap-1">
-          <LayerChip label="Friendly tracks" tone="friendly" active />
-          <LayerChip label="Hostile contacts" tone="threat" active />
-          <LayerChip label="Unknown / OSINT" tone="warning" active />
-          <LayerChip label="RF / SIGINT" tone="muted" />
-          <LayerChip label="Terrain shading" tone="muted" />
+      <DeepStateLayer paths={occupiedPaths} />
+      <MissionVectors entities={entities} units={units} />
+      <EnglishLabels />
+      <MissionMarkers
+        entities={entities}
+        units={units}
+        selectedId={selectedId}
+        onSelect={onSelect}
+      />
+
+      <div className="border-border bg-card/95 absolute left-3 top-3 z-30 w-[256px] border px-3 py-2 backdrop-blur">
+        <div className="label-cap-sm text-muted-foreground">
+          Operational map
         </div>
-
-        {/* Top-right: projection card */}
-        <div className="border-border bg-card absolute right-5 top-5 z-10 border px-3 py-2">
-          <div className="text-muted-foreground label-cap-sm">Projection</div>
-          <div className="text-foreground/95 font-mono text-[11px]">
-            WGS-84 · UTM 35S
-          </div>
-          <div className="bg-border my-1.5 h-px" />
-          <div className="flex items-center gap-2">
-            <div className="bg-foreground/70 h-px w-12" />
-            <span className="text-muted-foreground font-mono text-[10px]">
-              5&nbsp;NM
-            </span>
-          </div>
+        <div className="text-foreground mt-0.5 font-mono text-[11px] font-semibold">
+          DeepState occupied terrain
         </div>
-
-        {/* Bottom-left: compass rose (sharp, no rounded) */}
-        <div className="absolute bottom-5 left-5 z-10">
-          <CompassRose />
+        <div className="border-border mt-2 grid grid-cols-3 border-t pt-2">
+          <MapMetric label="Source" value="DeepState" />
+          <MapMetric label="Date" value={DEEPSTATE_DATE} />
+          <MapMetric label="Zoom" value={`Z${zoom}`} />
         </div>
+      </div>
 
-        {/* Bottom-right: MIL-STD legend */}
-        <div className="border-border bg-card absolute bottom-5 right-5 z-10 border px-3 py-2">
-          <div className="text-muted-foreground label-cap-sm mb-1.5">
-            MIL-STD
-          </div>
-          <div className="grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-[10px]">
-            <LegendRow tone="friendly" label="FRIEND" />
-            <LegendRow tone="hostile" label="HOSTILE" />
-            <LegendRow tone="unknown" label="UNKNOWN" />
-            <LegendRow tone="neutral" label="NEUTRAL" />
-          </div>
+      <div className="border-border bg-card/95 absolute right-3 top-3 z-30 w-[236px] border px-3 py-2 backdrop-blur">
+        <div className="mb-1.5 flex items-center justify-between gap-2">
+          <span className="label-cap-sm text-muted-foreground">Layers</span>
+          <span className="text-success font-mono text-[10px]">local</span>
         </div>
+        <div className="grid gap-1 font-mono text-[10px]">
+          <LayerRow label="Kepler.gl processor" tone="friendly" />
+          <LayerRow label="DeepState GeoJSON" tone="threat" />
+          <LayerRow label="CARTO English tiles" tone="muted" />
+          <LayerRow label="OSINT geotag cue" tone="warning" />
+          <LayerRow label="Friendly telemetry" tone="friendly" />
+          <LayerRow label="RF search area" tone="warning" />
+        </div>
+      </div>
+
+      <div className="border-border bg-card/95 absolute bottom-3 left-3 z-30 max-w-[275px] border px-3 py-2 backdrop-blur">
+        <div className="label-cap-sm text-muted-foreground">Dataset</div>
+        <div className="text-muted-foreground mt-0.5 truncate font-mono text-[9px]">
+          {DEEPSTATE_NAME} · latest daily fixture
+        </div>
+        <div className="border-border text-muted-foreground mt-1.5 flex gap-3 border-t pt-1.5 font-mono text-[9px]">
+          <span>kepler {keplerStats.status}</span>
+          <span>rows {keplerStats.rows}</span>
+          <span>fields {keplerStats.fields}</span>
+        </div>
+      </div>
+
+      <div className="border-border bg-card/95 absolute bottom-3 right-3 z-30 grid border backdrop-blur">
+        <button
+          type="button"
+          onClick={() => setZoom((current) => Math.min(MAX_ZOOM, current + 1))}
+          className="border-border hover:bg-secondary grid size-8 place-items-center border-b font-mono text-[15px] font-bold"
+          aria-label="Zoom in"
+        >
+          +
+        </button>
+        <button
+          type="button"
+          onClick={() => setZoom((current) => Math.max(MIN_ZOOM, current - 1))}
+          className="hover:bg-secondary grid size-8 place-items-center font-mono text-[15px] font-bold"
+          aria-label="Zoom out"
+        >
+          -
+        </button>
       </div>
     </section>
   );
 }
 
-function LayerChip({
+function TileMosaic({ tiles }: { tiles: Tile[] }) {
+  return (
+    <div className="absolute inset-0 opacity-80">
+      {tiles.map((tile) => (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={tile.key}
+          src={tile.src}
+          alt=""
+          className="absolute object-cover"
+          style={tile.style}
+          draggable={false}
+        />
+      ))}
+    </div>
+  );
+}
+
+function DeepStateLayer({ paths }: { paths: string[] }) {
+  return (
+    <svg
+      className="pointer-events-none absolute inset-0 z-10 size-full"
+      viewBox={`0 0 ${MAP_VIEWBOX.w} ${MAP_VIEWBOX.h}`}
+      preserveAspectRatio="none"
+      aria-hidden
+    >
+      <defs>
+        <pattern
+          id="deepstate-hatch"
+          patternUnits="userSpaceOnUse"
+          width="14"
+          height="14"
+          patternTransform="rotate(45)"
+        >
+          <line
+            x1="0"
+            y1="0"
+            x2="0"
+            y2="14"
+            stroke="hsl(var(--threat) / 0.34)"
+            strokeWidth="4"
+          />
+        </pattern>
+      </defs>
+      {paths.map((path, index) => (
+        <path
+          key={`occupied-${index}`}
+          d={path}
+          fill="url(#deepstate-hatch)"
+          fillRule="evenodd"
+          stroke="hsl(var(--threat))"
+          strokeLinejoin="round"
+          strokeWidth="2.4"
+          opacity="0.82"
+        />
+      ))}
+      {paths.map((path, index) => (
+        <path
+          key={`occupied-fill-${index}`}
+          d={path}
+          fill="hsl(var(--threat) / 0.13)"
+          fillRule="evenodd"
+        />
+      ))}
+    </svg>
+  );
+}
+
+function MissionVectors({
+  entities,
+  units,
+}: {
+  entities: Entity[];
+  units: Unit[];
+}) {
+  const routePath = toPath(ROUTE);
+  const rf = projectToSvg([48.78, 37.9]);
+
+  return (
+    <svg
+      className="pointer-events-none absolute inset-0 z-20 size-full"
+      viewBox={`0 0 ${MAP_VIEWBOX.w} ${MAP_VIEWBOX.h}`}
+      preserveAspectRatio="none"
+      aria-hidden
+    >
+      <path
+        d={routePath}
+        fill="none"
+        stroke="hsl(var(--background))"
+        strokeWidth="16"
+        strokeLinecap="square"
+        opacity="0.88"
+      />
+      <path
+        d={routePath}
+        fill="none"
+        stroke="hsl(var(--warning))"
+        strokeWidth="5"
+        strokeDasharray="18 14"
+        strokeLinecap="square"
+      />
+      <ellipse
+        cx={rf.x}
+        cy={rf.y}
+        rx="78"
+        ry="56"
+        fill="hsl(var(--warning) / 0.15)"
+        stroke="hsl(var(--warning))"
+        strokeWidth="3"
+        strokeDasharray="10 10"
+      />
+      {[...entities, ...units].map((object) => (
+        <TrackLine key={`track-${object._id}`} object={object} />
+      ))}
+    </svg>
+  );
+}
+
+function TrackLine({ object }: { object: Entity | Unit }) {
+  const point = projectToSvg(object.position);
+  const isFriendly =
+    object._type === 'Unit' || object.affiliation === 'friendly';
+  const dx = isFriendly ? -56 : -72;
+  const dy = isFriendly ? 32 : -42;
+
+  return (
+    <path
+      d={`M ${point.x + dx} ${point.y + dy} L ${point.x - dx * 0.18} ${point.y - dy * 0.18} L ${point.x} ${point.y}`}
+      fill="none"
+      stroke={isFriendly ? 'hsl(var(--friendly))' : 'hsl(var(--threat))'}
+      strokeWidth="4"
+      strokeDasharray="9 8"
+      opacity="0.78"
+    />
+  );
+}
+
+function EnglishLabels() {
+  return (
+    <div className="pointer-events-none absolute inset-0 z-20">
+      {ENGLISH_LABELS.map((label) => {
+        const style = positionStyle(label.position);
+        return (
+          <div
+            key={label.label}
+            className={[
+              'absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap text-center font-mono drop-shadow-[0_1px_0_hsl(var(--background))]',
+              label.kind === 'water'
+                ? 'text-[10px] uppercase tracking-[0.12em] text-[hsl(211_20%_38%)]'
+                : label.kind === 'region'
+                  ? 'text-[12px] font-semibold uppercase tracking-[0.08em] text-[hsl(220_15%_20%)]'
+                  : 'text-[10px] font-semibold text-[hsl(220_12%_18%)]',
+            ].join(' ')}
+            style={style}
+          >
+            {label.label}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function MissionMarkers({
+  entities,
+  units,
+  selectedId,
+  onSelect,
+}: {
+  entities: Entity[];
+  units: Unit[];
+  selectedId?: string;
+  onSelect: (o: AnyObject) => void;
+}) {
+  return (
+    <div className="absolute inset-0 z-20">
+      {units.map((unit) => (
+        <MarkerButton
+          key={unit._id}
+          label={unit.callsign}
+          meta={`${unit.status.toUpperCase()} · BAT ${unit.battery_pct ?? '--'}%`}
+          tone="friendly"
+          position={unit.position}
+          selected={unit._id === selectedId}
+          onClick={() => onSelect(unit)}
+        />
+      ))}
+      {entities.map((entity) => (
+        <MarkerButton
+          key={entity._id}
+          label={entity.name ?? entity._id}
+          meta={`${entity._subtype.toUpperCase()} · ${Math.round(
+            entity.confidence * 100
+          )}%`}
+          tone={entity.affiliation === 'hostile' ? 'threat' : 'warning'}
+          position={entity.position}
+          selected={entity._id === selectedId}
+          onClick={() => onSelect(entity)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function MarkerButton({
+  label,
+  meta,
+  tone,
+  position,
+  selected,
+  onClick,
+}: {
+  label: string;
+  meta: string;
+  tone: 'friendly' | 'threat' | 'warning';
+  position: LatLon;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        'absolute flex max-w-[148px] items-center gap-2 border bg-[hsl(220_18%_8%/0.92)] px-2 py-1 text-left shadow-none backdrop-blur transition-transform hover:scale-[1.02]',
+        selected ? 'ring-primary ring-1' : '',
+        tone === 'friendly'
+          ? 'border-friendly text-friendly'
+          : tone === 'threat'
+            ? 'border-threat text-threat'
+            : 'border-warning text-warning',
+      ].join(' ')}
+      style={{
+        ...positionStyle(position),
+        marginLeft: `${MARKER_OFFSETS[label]?.x ?? 8}px`,
+        marginTop: `${MARKER_OFFSETS[label]?.y ?? -12}px`,
+      }}
+      aria-label={label}
+    >
+      <span className="block size-2 shrink-0 bg-current" />
+      <span className="min-w-0">
+        <span className="block truncate font-mono text-[10px] font-bold leading-none">
+          {label}
+        </span>
+        <span className="text-muted-foreground mt-0.5 block truncate font-mono text-[9px] leading-none">
+          {meta}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function buildTiles(zoom: number): Tile[] {
+  const topLeft = webMercator([MAP_BOUNDS.latMax, MAP_BOUNDS.lonMin], zoom);
+  const bottomRight = webMercator([MAP_BOUNDS.latMin, MAP_BOUNDS.lonMax], zoom);
+  const width = bottomRight.x - topLeft.x;
+  const height = bottomRight.y - topLeft.y;
+  const xMin = Math.floor(topLeft.x / TILE_SIZE);
+  const xMax = Math.floor(bottomRight.x / TILE_SIZE);
+  const yMin = Math.floor(topLeft.y / TILE_SIZE);
+  const yMax = Math.floor(bottomRight.y / TILE_SIZE);
+  const tiles: Tile[] = [];
+
+  for (let y = yMin; y <= yMax; y += 1) {
+    for (let x = xMin; x <= xMax; x += 1) {
+      const host = TILE_HOSTS[Math.abs(x + y) % TILE_HOSTS.length];
+      tiles.push({
+        key: `${zoom}-${x}-${y}`,
+        src: `https://${host}.basemaps.cartocdn.com/light_nolabels/${zoom}/${x}/${y}@2x.png`,
+        style: {
+          left: `${((x * TILE_SIZE - topLeft.x) / width) * 100}%`,
+          top: `${((y * TILE_SIZE - topLeft.y) / height) * 100}%`,
+          width: `${(TILE_SIZE / width) * 100}%`,
+          height: `${(TILE_SIZE / height) * 100}%`,
+        },
+      });
+    }
+  }
+
+  return tiles;
+}
+
+function buildDeepStatePaths() {
+  const collection = deepStateOccupied as unknown as DeepStateFeatureCollection;
+
+  return collection.features.flatMap((feature) => {
+    if (feature.geometry.type === 'Polygon') {
+      return [polygonToPath(feature.geometry.coordinates)];
+    }
+
+    return feature.geometry.coordinates.map(polygonToPath);
+  });
+}
+
+function polygonToPath(polygon: GeoJsonPolygon) {
+  return polygon
+    .map((ring) =>
+      ring
+        .map(([lon, lat], index) => {
+          const point = projectToSvg([lat, lon]);
+          return `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`;
+        })
+        .join(' ')
+        .concat(' Z')
+    )
+    .join(' ');
+}
+
+function webMercator([lat, lon]: LatLon, zoom: number) {
+  const sin = Math.sin((lat * Math.PI) / 180);
+  const scale = TILE_SIZE * 2 ** zoom;
+
+  return {
+    x: ((lon + 180) / 360) * scale,
+    y: (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * scale,
+  };
+}
+
+function projectToSvg(position: LatLon) {
+  const topLeft = webMercator([MAP_BOUNDS.latMax, MAP_BOUNDS.lonMin], 8);
+  const bottomRight = webMercator([MAP_BOUNDS.latMin, MAP_BOUNDS.lonMax], 8);
+  const point = webMercator(position, 8);
+
+  return {
+    x: ((point.x - topLeft.x) / (bottomRight.x - topLeft.x)) * MAP_VIEWBOX.w,
+    y: ((point.y - topLeft.y) / (bottomRight.y - topLeft.y)) * MAP_VIEWBOX.h,
+  };
+}
+
+function positionStyle(position: LatLon) {
+  const point = projectToSvg(position);
+  return {
+    left: `${(point.x / MAP_VIEWBOX.w) * 100}%`,
+    top: `${(point.y / MAP_VIEWBOX.h) * 100}%`,
+  };
+}
+
+function toPath(points: LatLon[]) {
+  return points
+    .map((point, index) => {
+      const { x, y } = projectToSvg(point);
+      return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
+    })
+    .join(' ');
+}
+
+function MapMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="label-cap-sm text-muted-foreground">{label}</div>
+      <div className="text-foreground mt-0.5 truncate font-mono text-[10px]">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function LayerRow({
   label,
   tone,
-  active = false,
 }: {
   label: string;
   tone: 'friendly' | 'threat' | 'warning' | 'muted';
-  active?: boolean;
 }) {
-  const dotClass =
+  const dot =
     tone === 'friendly'
       ? 'bg-friendly'
       : tone === 'threat'
         ? 'bg-threat'
         : tone === 'warning'
           ? 'bg-warning'
-          : 'bg-muted-foreground/50';
+          : 'bg-muted-foreground';
   return (
-    <div
-      className={[
-        'border-border flex w-fit items-center gap-2 border px-2.5 py-1 transition-colors',
-        active ? 'bg-card text-foreground' : 'bg-card/50 text-muted-foreground',
-      ].join(' ')}
-    >
-      <span aria-hidden className={`size-1.5 ${dotClass}`} />
-      <span className="label-cap-sm">{label}</span>
+    <div className="flex items-center gap-2">
+      <span className={`size-1.5 ${dot}`} />
+      <span className="text-muted-foreground truncate">{label}</span>
     </div>
-  );
-}
-
-function LegendRow({
-  tone,
-  label,
-}: {
-  tone: 'friendly' | 'hostile' | 'unknown' | 'neutral';
-  label: string;
-}) {
-  const t = affiliationToken(tone);
-  return (
-    <div className="flex items-center gap-1.5">
-      <svg width="12" height="12">
-        {tone === 'friendly' && (
-          <rect
-            x={1}
-            y={3}
-            width={10}
-            height={6}
-            fill="none"
-            stroke={t.hsl}
-            strokeWidth={1.4}
-          />
-        )}
-        {tone === 'hostile' && (
-          <polygon
-            points="6,1 11,6 6,11 1,6"
-            fill="none"
-            stroke={t.hsl}
-            strokeWidth={1.4}
-          />
-        )}
-        {tone === 'unknown' && (
-          <path
-            d="M6 1 C8 1, 11 4, 11 6 C11 8, 8 11, 6 11 C4 11, 1 8, 1 6 C1 4, 4 1, 6 1 Z"
-            fill="none"
-            stroke={t.hsl}
-            strokeWidth={1.4}
-          />
-        )}
-        {tone === 'neutral' && (
-          <circle
-            cx={6}
-            cy={6}
-            r={5}
-            fill="none"
-            stroke={t.hsl}
-            strokeWidth={1.4}
-          />
-        )}
-      </svg>
-      <span className="text-foreground/85">{label}</span>
-    </div>
-  );
-}
-
-function CompassRose() {
-  return (
-    <div className="border-border bg-card grid size-16 place-items-center border">
-      <svg viewBox="0 0 100 100" className="size-12">
-        <g
-          transform="translate(50,50)"
-          stroke="hsl(38 25% 75% / 0.6)"
-          fill="none"
-          strokeWidth="0.6"
-        >
-          <circle r="32" />
-          <circle r="22" strokeDasharray="1.5 3" opacity="0.5" />
-          {[0, 90, 180, 270].map((a) => (
-            <line
-              key={a}
-              x1="0"
-              y1="-32"
-              x2="0"
-              y2="-29"
-              transform={`rotate(${a})`}
-              strokeWidth={1.4}
-            />
-          ))}
-        </g>
-        <g
-          transform="translate(50,50)"
-          fill="hsl(var(--primary))"
-          stroke="hsl(var(--primary))"
-        >
-          <polygon points="0,-26 5,0 0,4 -5,0" />
-        </g>
-        <text
-          x="50"
-          y="14"
-          textAnchor="middle"
-          fontSize="9"
-          fontFamily="var(--font-mono)"
-          fill="hsl(var(--foreground))"
-        >
-          N
-        </text>
-      </svg>
-    </div>
-  );
-}
-
-interface TacticalMapProps {
-  entities: Entity[];
-  units: Unit[];
-  selectedId?: string;
-  onSelect: (o: AnyObject) => void;
-}
-
-function TacticalMap({
-  entities,
-  units,
-  selectedId,
-  onSelect,
-}: TacticalMapProps) {
-  return (
-    <svg
-      viewBox={`0 0 ${MAP_VIEWBOX.w} ${MAP_VIEWBOX.h}`}
-      preserveAspectRatio="xMidYMid slice"
-      className="absolute inset-0 size-full"
-    >
-      {/* Hairline grid (10 NM cells) */}
-      <g stroke="hsl(38 20% 70% / 0.06)" strokeWidth="0.6">
-        {Array.from({ length: 21 }).map((_, i) => (
-          <line key={`v${i}`} x1={i * 50} y1="0" x2={i * 50} y2="700" />
-        ))}
-        {Array.from({ length: 15 }).map((_, i) => (
-          <line key={`h${i}`} x1="0" y1={i * 50} x2="1000" y2={i * 50} />
-        ))}
-      </g>
-      {/* Heavier grid every 100 px */}
-      <g stroke="hsl(38 20% 70% / 0.12)" strokeWidth="0.7">
-        {Array.from({ length: 11 }).map((_, i) => (
-          <line key={`V${i}`} x1={i * 100} y1="0" x2={i * 100} y2="700" />
-        ))}
-        {Array.from({ length: 8 }).map((_, i) => (
-          <line key={`H${i}`} x1="0" y1={i * 100} x2="1000" y2={i * 100} />
-        ))}
-      </g>
-
-      {/* Lat/Lon tick labels (mono, faint) — only inside columns 2..9 to
-          avoid corner collisions with chrome */}
-      <g
-        fontFamily="var(--font-mono)"
-        fontSize="9"
-        fill="hsl(38 18% 60% / 0.6)"
-      >
-        {[200, 300, 400, 500, 600, 700, 800].map((x) => {
-          const lon =
-            MAP_BOUNDS.lon_min +
-            (x / MAP_VIEWBOX.w) * (MAP_BOUNDS.lon_max - MAP_BOUNDS.lon_min);
-          return (
-            <text key={`tx${x}`} x={x + 4} y={11}>
-              {lon.toFixed(2)}°E
-            </text>
-          );
-        })}
-        {[200, 300, 400, 500].map((y) => {
-          const lat =
-            MAP_BOUNDS.lat_max -
-            (y / MAP_VIEWBOX.h) * (MAP_BOUNDS.lat_max - MAP_BOUNDS.lat_min);
-          return (
-            <text key={`ty${y}`} x={4} y={y + 12}>
-              {lat.toFixed(2)}°N
-            </text>
-          );
-        })}
-      </g>
-
-      {/* Topographic contour curves */}
-      <g fill="none" stroke="hsl(28 40% 65% / 0.18)" strokeWidth="1.1">
-        <path d="M -20 220 Q 180 160, 360 240 T 760 200 T 1020 260" />
-        <path
-          d="M -20 280 Q 180 230, 360 310 T 760 270 T 1020 330"
-          strokeWidth="0.9"
-          opacity="0.65"
-        />
-        <path
-          d="M -20 340 Q 180 310, 360 380 T 760 350 T 1020 410"
-          strokeWidth="0.7"
-          opacity="0.5"
-        />
-      </g>
-
-      {/* Coastline */}
-      <path
-        d="M -20 460 C 80 420, 220 480, 320 440 S 540 470, 660 430 S 880 450, 1020 410"
-        fill="none"
-        stroke="hsl(38 25% 78% / 0.55)"
-        strokeWidth="1.4"
-      />
-      <path
-        d="M -20 460 C 80 420, 220 480, 320 440 S 540 470, 660 430 S 880 450, 1020 410 L 1020 720 L -20 720 Z"
-        fill="hsl(210 50% 28% / 0.08)"
-      />
-
-      {/* Place labels — italic serif, only used very sparingly */}
-      <g
-        fontFamily="var(--font-serif)"
-        fontStyle="italic"
-        fill="hsl(38 25% 75% / 0.55)"
-      >
-        <text x="190" y="180" fontSize="14">
-          Limnos
-        </text>
-        <text x="640" y="170" fontSize="14">
-          Imbros
-        </text>
-        <text x="380" y="600" fontSize="13">
-          Aegean Sea
-        </text>
-      </g>
-
-      {/* Tracks: friendly + threat (dashed gradients). Hand-authored
-          to match the fixture entity positions. */}
-      <defs>
-        <linearGradient id="trackFriendly" x1="0" x2="1" y1="0" y2="0">
-          <stop offset="0%" stopColor="hsl(var(--friendly))" stopOpacity="0" />
-          <stop
-            offset="100%"
-            stopColor="hsl(var(--friendly))"
-            stopOpacity="0.85"
-          />
-        </linearGradient>
-        <linearGradient id="trackThreat" x1="0" x2="1" y1="0" y2="0">
-          <stop offset="0%" stopColor="hsl(var(--threat))" stopOpacity="0" />
-          <stop
-            offset="100%"
-            stopColor="hsl(var(--threat))"
-            stopOpacity="0.9"
-          />
-        </linearGradient>
-      </defs>
-
-      {/* Threat track approaching from NE */}
-      <path
-        d="M 800 80 Q 720 130, 660 170 T 580 210"
-        fill="none"
-        stroke="url(#trackThreat)"
-        strokeWidth="1.6"
-        strokeDasharray="2 3"
-      />
-
-      {/* Render units (friendly) */}
-      {units.map((u) => {
-        const { x, y } = latLonToSvg(u.position);
-        const isSelected = selectedId === u._id;
-        return (
-          <g
-            key={u._id}
-            onClick={() => onSelect(u)}
-            style={{ cursor: 'pointer' }}
-          >
-            <EntityGlyph
-              affiliation="friendly"
-              shape={
-                u._subtype === 'drone'
-                  ? 'air'
-                  : u._subtype === 'boat'
-                    ? 'sea'
-                    : u._subtype === 'infantry'
-                      ? 'person'
-                      : 'ground'
-              }
-              cx={x}
-              cy={y}
-              heading_deg={u.heading_deg}
-              size={14}
-            />
-            <text
-              x={x + 12}
-              y={y - 4}
-              fontFamily="var(--font-mono)"
-              fontSize="10"
-              fontWeight="700"
-              fill="hsl(var(--friendly))"
-            >
-              {u.callsign}
-            </text>
-            <text
-              x={x + 12}
-              y={y + 8}
-              fontFamily="var(--font-mono)"
-              fontSize="9"
-              fill="hsl(var(--muted-foreground))"
-            >
-              {u.heading_deg ?? 0}° · {u.speed_mps ?? 0}m/s
-            </text>
-            {isSelected && <SelectionBracket cx={x} cy={y} size={28} />}
-          </g>
-        );
-      })}
-
-      {/* Render entities (hostile / unknown) */}
-      {entities.map((e) => {
-        const { x, y } = latLonToSvg(e.position);
-        const isSelected = selectedId === e._id;
-        const shape: 'air' | 'ground' | 'sea' | 'person' =
-          e._subtype === 'Aircraft'
-            ? 'air'
-            : e._subtype === 'Vessel'
-              ? 'sea'
-              : e._subtype === 'Person'
-                ? 'person'
-                : 'ground';
-        return (
-          <g
-            key={e._id}
-            onClick={() => onSelect(e)}
-            style={{ cursor: 'pointer' }}
-          >
-            {/* Pulse-ring on hostile selected */}
-            {isSelected && e.affiliation === 'hostile' && (
-              <circle
-                cx={x}
-                cy={y}
-                r="22"
-                className="pulse-ring"
-                fill="hsl(var(--threat) / 0.22)"
-                stroke="hsl(var(--threat) / 0.6)"
-                strokeWidth="1"
-              />
-            )}
-            <EntityGlyph
-              affiliation={e.affiliation}
-              shape={shape}
-              cx={x}
-              cy={y}
-              heading_deg={e.heading_deg}
-              size={14}
-            />
-            <text
-              x={x + 12}
-              y={y - 4}
-              fontFamily="var(--font-mono)"
-              fontSize="10"
-              fontWeight="700"
-              fill={
-                e.affiliation === 'hostile'
-                  ? 'hsl(var(--threat))'
-                  : 'hsl(var(--warning))'
-              }
-            >
-              {e.name ?? e._id}
-            </text>
-            {(e.altitude_m || e.speed_mps) && (
-              <text
-                x={x + 12}
-                y={y + 8}
-                fontFamily="var(--font-mono)"
-                fontSize="9"
-                fill="hsl(var(--muted-foreground))"
-              >
-                {e.altitude_m ? `${e.altitude_m}m · ` : ''}
-                {e.speed_mps ? `${e.speed_mps}m/s` : ''}
-              </text>
-            )}
-            {isSelected && <SelectionBracket cx={x} cy={y} size={28} />}
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
-
-// 4-corner SVG bracket reticle around a selected entity glyph.
-function SelectionBracket({
-  cx,
-  cy,
-  size = 24,
-}: {
-  cx: number;
-  cy: number;
-  size?: number;
-}) {
-  const r = size / 2;
-  const arm = 5;
-  const stroke = 'hsl(var(--primary))';
-  return (
-    <g stroke={stroke} strokeWidth="1.5" fill="none">
-      {/* TL */}
-      <line x1={cx - r} y1={cy - r} x2={cx - r + arm} y2={cy - r} />
-      <line x1={cx - r} y1={cy - r} x2={cx - r} y2={cy - r + arm} />
-      {/* TR */}
-      <line x1={cx + r} y1={cy - r} x2={cx + r - arm} y2={cy - r} />
-      <line x1={cx + r} y1={cy - r} x2={cx + r} y2={cy - r + arm} />
-      {/* BL */}
-      <line x1={cx - r} y1={cy + r} x2={cx - r + arm} y2={cy + r} />
-      <line x1={cx - r} y1={cy + r} x2={cx - r} y2={cy + r - arm} />
-      {/* BR */}
-      <line x1={cx + r} y1={cy + r} x2={cx + r - arm} y2={cy + r} />
-      <line x1={cx + r} y1={cy + r} x2={cx + r} y2={cy + r - arm} />
-    </g>
   );
 }

@@ -2,8 +2,8 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Mission Commander',
-    short_name: 'Mission Commander',
+    name: 'Edge C2',
+    short_name: 'Edge C2',
     description:
       'Edge-native AI mission command — fused operational picture, explainable recommendations, human-in-the-loop tasking.',
     start_url: '/',
@@ -50,8 +50,8 @@ export default function manifest(): MetadataRoute.Manifest {
 
 export const Metadata = {
   title: {
-    default: 'Mission Commander',
-    template: '%s | Mission Commander',
+    default: 'Edge C2',
+    template: '%s | Edge C2',
   },
   description:
     'Edge-native AI mission command — fused operational picture, explainable recommendations, human-in-the-loop tasking.',

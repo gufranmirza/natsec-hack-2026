@@ -3,45 +3,45 @@
 @tailwind utilities;
 
 /*
- * Mission Commander — editorial tactical theme (foundation pass v2).
+ * Edge C2 — compact operational theme (foundation pass v3).
  *
  * Design discipline:
  *   - Sharp corners. Operator station, not consumer SaaS. --radius is 0.
  *     Brand mark and primary CTA opt back in to soft corners explicitly.
  *   - Hairline frames over drop shadows. Cards = color shift +
  *     1px border. No box-shadow elevation; depth comes from value.
- *   - Single warm-amber accent. Used ruthlessly for "AI / focusable now."
+ *   - Single amber accent. Used ruthlessly for "AI / focusable now."
  *     Semantic colors (threat/friendly/warning/success) reserved for
  *     mission status, never for UI affordance.
  *   - Tactical surfaces (the operational map, selected-entity dossier)
  *     are sealed-off dark blocks via .invert-surface so glyphs and
- *     tracks pop. Light shell elsewhere — newspaper-morning energy
- *     with a battle map at the center.
+ *     tracks pop. Light shell elsewhere — grey command software,
+ *     not lifestyle editorial beige.
  */
 
 @layer base {
   :root {
-    /* — Surface scale (light, warm) ——————————————————————— */
-    --background: 36 28% 97%;
-    --foreground: 222 26% 12%;
+    /* — Surface scale (neutral grey) ————————————————————— */
+    --background: 220 14% 96%;
+    --foreground: 222 24% 10%;
     --card: 0 0% 100%;
-    --card-foreground: 222 26% 12%;
+    --card-foreground: 222 24% 10%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222 26% 12%;
+    --popover-foreground: 222 24% 10%;
 
-    /* — Brand accent: warm amber (rare, semantic) ——————— */
-    --primary: 24 78% 48%;
-    --primary-foreground: 36 28% 98%;
-    --brand-from: 24 80% 50%;
-    --brand-to: 14 75% 48%;
+    /* — Brand accent: muted amber (rare, semantic) ——————— */
+    --primary: 24 66% 43%;
+    --primary-foreground: 0 0% 98%;
+    --brand-from: 24 66% 43%;
+    --brand-to: 16 60% 38%;
 
     /* — Neutrals ——————————————————————————————————————— */
-    --secondary: 36 20% 93%;
-    --secondary-foreground: 222 22% 18%;
-    --muted: 36 18% 94%;
-    --muted-foreground: 222 10% 42%;
-    --accent: 24 70% 95%;
-    --accent-foreground: 24 80% 32%;
+    --secondary: 220 12% 91%;
+    --secondary-foreground: 222 18% 16%;
+    --muted: 220 11% 93%;
+    --muted-foreground: 222 9% 39%;
+    --accent: 220 12% 89%;
+    --accent-foreground: 222 24% 12%;
 
     /* — Status — combat / mission semantics ————————————— */
     --destructive: 8 78% 48%;
@@ -50,7 +50,7 @@
     --threat-foreground: 0 0% 100%;
     --friendly: 210 65% 38%;
     --friendly-foreground: 0 0% 100%;
-    --warning: 32 92% 46%;
+    --warning: 36 74% 43%;
     --warning-foreground: 0 0% 100%;
     --success: 152 50% 32%;
     --success-foreground: 0 0% 100%;
@@ -64,12 +64,12 @@
     --radius: 0px;
 
     /* — Sidebar — slightly cooler/darker than canvas ————— */
-    --sidebar-background: 36 22% 95%;
+    --sidebar-background: 220 12% 94%;
     --sidebar-foreground: 222 18% 28%;
-    --sidebar-primary: 24 78% 48%;
+    --sidebar-primary: 24 66% 43%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 36 20% 92%;
-    --sidebar-accent-foreground: 222 26% 12%;
+    --sidebar-accent: 220 12% 90%;
+    --sidebar-accent-foreground: 222 24% 12%;
     --sidebar-border: 222 12% 86%;
     --sidebar-ring: 24 78% 48%;
 
@@ -85,24 +85,24 @@
    * uses the dark palette for everything inside. */
   .invert-surface {
     --background: 222 35% 6%;
-    --foreground: 38 28% 92%;
-    --card: 222 30% 9%;
-    --card-foreground: 38 28% 92%;
-    --popover: 222 32% 8%;
-    --popover-foreground: 38 28% 92%;
-    --secondary: 222 22% 13%;
-    --secondary-foreground: 38 20% 88%;
-    --muted: 222 20% 12%;
-    --muted-foreground: 38 12% 62%;
-    --accent: 24 50% 16%;
-    --accent-foreground: 24 78% 75%;
+    --foreground: 220 14% 92%;
+    --card: 222 24% 9%;
+    --card-foreground: 220 14% 92%;
+    --popover: 222 26% 8%;
+    --popover-foreground: 220 14% 92%;
+    --secondary: 222 18% 13%;
+    --secondary-foreground: 220 12% 88%;
+    --muted: 222 18% 12%;
+    --muted-foreground: 220 9% 64%;
+    --accent: 222 18% 16%;
+    --accent-foreground: 220 14% 90%;
     --border: 222 18% 18%;
     --input: 222 18% 18%;
-    --primary: 28 75% 60%;
+    --primary: 32 66% 56%;
     --primary-foreground: 222 40% 8%;
     --threat: 12 78% 60%;
     --friendly: 200 55% 65%;
-    --warning: 35 88% 62%;
+    --warning: 36 74% 56%;
     --success: 150 35% 56%;
     --topo-ink: 38 25% 70%;
     --topo-alpha: 0.04;
@@ -116,7 +116,8 @@
   * {
     @apply border-border;
   }
-  html, body {
+  html,
+  body {
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
     font-feature-settings: 'ss01', 'cv11';
@@ -126,7 +127,12 @@
   .font-mono {
     font-variant-numeric: tabular-nums;
   }
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: var(--font-serif), 'Iowan Old Style', 'Georgia', serif;
     font-weight: 500;
   }
@@ -209,7 +215,9 @@
 
   /* — Targeting cursor — applied to the operational map area.
    *   Native crosshair is enough; signals "this is a sighted surface." */
-  .cursor-target { cursor: crosshair; }
+  .cursor-target {
+    cursor: crosshair;
+  }
 
   /* — Corner-bracket reticles — universal "selected / focusable / target"
    *   affordance. Wrap a positioned container with .brackets and the
@@ -254,16 +262,45 @@
     pointer-events: none;
     border-color: hsl(var(--primary));
   }
-  .brackets-4::before { top: -1px; left: -1px; border-top: 1.5px solid; border-left: 1.5px solid; }
-  .brackets-4::after  { bottom: -1px; right: -1px; border-bottom: 1.5px solid; border-right: 1.5px solid; }
-  .brackets-4 > .br-tr { top: -1px; right: -1px; border-top: 1.5px solid; border-right: 1.5px solid; }
-  .brackets-4 > .br-bl { bottom: -1px; left: -1px; border-bottom: 1.5px solid; border-left: 1.5px solid; }
+  .brackets-4::before {
+    top: -1px;
+    left: -1px;
+    border-top: 1.5px solid;
+    border-left: 1.5px solid;
+  }
+  .brackets-4::after {
+    bottom: -1px;
+    right: -1px;
+    border-bottom: 1.5px solid;
+    border-right: 1.5px solid;
+  }
+  .brackets-4 > .br-tr {
+    top: -1px;
+    right: -1px;
+    border-top: 1.5px solid;
+    border-right: 1.5px solid;
+  }
+  .brackets-4 > .br-bl {
+    bottom: -1px;
+    left: -1px;
+    border-bottom: 1.5px solid;
+    border-left: 1.5px solid;
+  }
 
   /* — Pulsing target ring — used on selected hostile entity. */
   @keyframes pulse-ring {
-    0%   { transform: scale(0.85); opacity: 0.85; }
-    70%  { transform: scale(1.6);  opacity: 0;    }
-    100% { transform: scale(1.6);  opacity: 0;    }
+    0% {
+      transform: scale(0.85);
+      opacity: 0.85;
+    }
+    70% {
+      transform: scale(1.6);
+      opacity: 0;
+    }
+    100% {
+      transform: scale(1.6);
+      opacity: 0;
+    }
   }
   .pulse-ring {
     animation: pulse-ring 2.4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
@@ -272,29 +309,49 @@
 
   /* — Mic breath — soft outer pulse on voice button. */
   @keyframes mic-breath {
-    0%, 100% {
+    0%,
+    100% {
       box-shadow: 0 0 0 0 hsl(var(--primary) / 0.5);
     }
     50% {
       box-shadow: 0 0 0 14px hsl(var(--primary) / 0);
     }
   }
-  .mic-breath { animation: mic-breath 2.6s ease-in-out infinite; }
+  .mic-breath {
+    animation: mic-breath 2.6s ease-in-out infinite;
+  }
 
   /* — Feed entry slide — used on the freshest item in change feed. */
   @keyframes feed-enter {
-    0%   { opacity: 0; transform: translateY(6px); }
-    50%  { opacity: 1; }
-    100% { opacity: 1; transform: translateY(0); }
+    0% {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    50% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
-  .feed-enter { animation: feed-enter 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .feed-enter {
+    animation: feed-enter 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
 
   /* — Live blip — slow shimmer on the active sensor track. */
   @keyframes blip {
-    0%, 100% { opacity: 0.55; }
-    50%      { opacity: 1; }
+    0%,
+    100% {
+      opacity: 0.55;
+    }
+    50% {
+      opacity: 1;
+    }
   }
-  .blip { animation: blip 2.2s ease-in-out infinite; }
+  .blip {
+    animation: blip 2.2s ease-in-out infinite;
+  }
 
   /* — Editorial small-uppercase tracked label. Tighter than before
    *   to push toward Bloomberg-density. */
