@@ -36,6 +36,11 @@ import {
   Section,
   type WorkspaceSectionId,
 } from '@/components/_columns/col-status';
+import {
+  DroneCameraView,
+  hasCameraCapability,
+  isDroneUnit,
+} from '@/components/_columns/drone-pov-panel';
 import { MarkdownAnswer } from '@/components/_ontology/markdown-answer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -389,39 +394,33 @@ function DroneLiveSurface({
   onLaunchDrone: (unitId: string) => void;
   onLaunchSwarm: () => void;
 }) {
-  const [tick, setTick] = useState(0);
-  const drone =
-    units.find((unit) => unit._id === activeDroneFeed) ??
-    units.find((unit) => unit._id === 'unit_rook1') ??
-    units[0];
-  const drones = units.filter((unit) => unit._subtype === 'drone');
-  const now = new Date();
-  const heading = Math.round((drone?.heading_deg ?? 86) + ((tick % 11) - 5));
-  const speed = Math.max(0, Math.round((drone?.speed_mps ?? 22) + (tick % 5)));
-  const altitude = Math.max(
-    80,
-    Math.round((drone?.altitude_m ?? 420) + Math.sin(tick / 3) * 14)
-  );
-  const battery = Math.max(
-    8,
-    Math.round((drone?.battery_pct ?? 71) - tick * 0.03)
-  );
-  const lat = ((drone?.position[0] ?? 48.74) + Math.sin(tick / 11) * 0.006)
-    .toFixed(5)
-    .toString();
-  const lon = ((drone?.position[1] ?? 37.62) + Math.cos(tick / 9) * 0.007)
-    .toFixed(5)
-    .toString();
-  const linkQuality = Math.max(82, 98 - (tick % 9));
-  const frameId = 18420 + tick * 24;
+  // All drones in the fleet — drone, drone_isr, drone_strike subtypes.
+  // Camera-equipped subset feeds the EO/IR viewer; uncrewed cargo /
+  // strike drones without optical sensors stay in the fleet list but
+  // can't be selected as the active feed.
+  const drones = units.filter(isDroneUnit);
+  const cameraDrones = drones.filter(hasCameraCapability);
+  const seedId =
+    activeDroneFeed && cameraDrones.some((d) => d._id === activeDroneFeed)
+      ? activeDroneFeed
+      : (cameraDrones[0]?._id ?? null);
+  const [selectedId, setSelectedId] = useState<string | null>(seedId);
 
+  // Sync local selection with parent when the upstream activeDroneFeed
+  // changes (e.g., operator clicked a drone marker on the map).
   useEffect(() => {
-    const id = window.setInterval(
-      () => setTick((current) => current + 1),
-      1000
-    );
-    return () => window.clearInterval(id);
-  }, []);
+    if (
+      activeDroneFeed &&
+      cameraDrones.some((d) => d._id === activeDroneFeed)
+    ) {
+      setSelectedId(activeDroneFeed);
+    }
+  }, [activeDroneFeed, cameraDrones]);
+
+  const drone =
+    cameraDrones.find((d) => d._id === selectedId) ??
+    cameraDrones[0] ??
+    drones[0];
 
   return (
     <section className="bg-background flex h-full min-h-0 flex-col overflow-hidden">
@@ -431,82 +430,55 @@ function DroneLiveSurface({
         title={drone ? `${drone.callsign} EO/IR` : 'Drone camera'}
         meta={
           drone
-            ? `${drone.status.replace('_', ' ')} · ${drone.battery_pct ?? '--'}% battery`
+            ? `${(drone.status ?? '—').replace('_', ' ')} · ${drone.battery_pct ?? '--'}% battery · ${cameraDrones.length} cam-equipped`
             : 'standby'
         }
       />
-      <div className="bg-border grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_300px] gap-px">
-        <div
-          className="relative overflow-hidden"
-          style={{ backgroundColor: 'hsl(206 18% 8%)' }}
-        >
-          <div
-            className="absolute inset-0"
-            style={{
-              background:
-                'radial-gradient(circle at 55% 45%, hsl(182 75% 70% / 0.18), transparent 18%), linear-gradient(135deg, hsl(206 16% 9%), hsl(210 22% 14%) 45%, hsl(204 18% 7%))',
-            }}
-          />
-          <div
-            className="absolute inset-0 opacity-35"
-            style={{
-              backgroundImage:
-                'linear-gradient(transparent 0, transparent 11px, hsl(180 80% 80% / 0.18) 12px)',
-              backgroundSize: '100% 12px',
-              transform: `translateY(${tick % 12}px)`,
-            }}
-          />
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0,transparent_24%,hsl(0_0%_0%/0.26)_72%)]" />
-          <div
-            className="border-success/70 absolute h-[22%] w-[28%] border"
-            style={{
-              left: `${18 + Math.sin(tick / 5) * 1.8}%`,
-              top: `${22 + Math.cos(tick / 6) * 1.4}%`,
-            }}
-          >
-            <span className="bg-success text-background absolute -top-5 left-0 px-1.5 font-mono text-[10px] font-bold">
-              VEHICLE SCAR
-            </span>
-          </div>
-          <div
-            className="border-warning absolute h-[15%] w-[18%] border"
-            style={{
-              left: `${58 + Math.cos(tick / 4) * 2.2}%`,
-              top: `${38 + Math.sin(tick / 4) * 1.8}%`,
-            }}
-          >
-            <span className="bg-warning text-background absolute -top-5 left-0 px-1.5 font-mono text-[10px] font-bold">
-              HEAT TRACE
-            </span>
-          </div>
-          <div className="text-primary absolute inset-x-8 bottom-8 grid grid-cols-4 gap-2 font-mono text-[11px]">
-            <CameraMetric label="MODE" value="EO/IR FUSED" />
-            <CameraMetric label="HDG/SPD" value={`${heading}deg ${speed}m/s`} />
-            <CameraMetric label="ALT" value={`${altitude}m`} />
-            <CameraMetric label="LINK" value={`${linkQuality}% LOCAL`} />
-          </div>
-          <div className="border-primary/70 absolute left-1/2 top-1/2 size-24 -translate-x-1/2 -translate-y-1/2 border">
-            <span className="bg-primary absolute left-1/2 top-1/2 size-1 -translate-x-1/2 -translate-y-1/2" />
-          </div>
-          <div className="text-primary/80 absolute left-5 top-5 font-mono text-[10px] leading-relaxed">
-            <div>LAT {lat}</div>
-            <div>LON {lon}</div>
-            <div>GIMBAL {-18 + (tick % 5)}deg</div>
-            <div>FRAME {frameId}</div>
-          </div>
-          <div className="border-primary/60 bg-background/70 text-primary absolute right-5 top-5 border px-3 py-2 font-mono text-[10px]">
-            LIVE SIM · {now.toISOString().split('T')[1]?.slice(0, 8)}Z
+      <div className="bg-border grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_320px] gap-px">
+        <div className="bg-[hsl(220_25%_8%)] flex min-h-0 flex-col overflow-hidden">
+          {drone && hasCameraCapability(drone) ? (
+            <DroneCameraView unit={drone} className="min-h-0 flex-1" />
+          ) : (
+            <div className="text-muted-foreground flex flex-1 items-center justify-center font-mono text-[12px]">
+              {drones.length === 0
+                ? 'No drones online — fleet roster is empty.'
+                : 'Selected drone has no camera payload.'}
+            </div>
+          )}
+          <div className="border-border bg-background grid grid-cols-2 gap-px border-t md:grid-cols-4">
+            {cameraDrones.map((unit) => (
+              <button
+                key={unit._id}
+                type="button"
+                onClick={() => setSelectedId(unit._id)}
+                className={[
+                  'border-border bg-card flex min-w-0 flex-col gap-0.5 px-3 py-2 text-left transition-colors hover:bg-secondary',
+                  unit._id === drone?._id ? 'ring-primary ring-2 ring-inset' : '',
+                ].join(' ')}
+                aria-pressed={unit._id === drone?._id}
+              >
+                <span className="text-foreground truncate font-mono text-[11px] font-bold">
+                  {unit.callsign}
+                </span>
+                <span className="text-muted-foreground truncate font-mono text-[9px]">
+                  {(unit.status ?? '—').replace('_', ' ')} · BAT{' '}
+                  {unit.battery_pct ?? '--'}% · {unit.altitude_m ?? '--'}m
+                </span>
+              </button>
+            ))}
           </div>
         </div>
         <div className="bg-background min-h-0 overflow-y-auto">
           <div className="border-border border-b p-4">
             <PanelTitle title="Task controls" meta="human approved" />
             <div className="mt-3 grid gap-2">
-              <ActionSurfaceButton
-                label="Launch ROOK-1"
-                meta="open live camera + overwatch"
-                onClick={() => onLaunchDrone('unit_rook1')}
-              />
+              {drone ? (
+                <ActionSurfaceButton
+                  label={`Launch ${drone.callsign}`}
+                  meta="open live camera + overwatch"
+                  onClick={() => onLaunchDrone(drone._id)}
+                />
+              ) : null}
               <ActionSurfaceButton
                 label="Coordinate swarm"
                 meta="ROOK-1 overwatch · ROOK-2 flank"
@@ -514,26 +486,58 @@ function DroneLiveSurface({
               />
             </div>
           </div>
+          {drone ? (
+            <div className="border-border border-b p-4">
+              <PanelTitle
+                title="Flight data stream"
+                meta={`${drone.callsign} · ${drone.capabilities.join(' · ').toUpperCase() || '—'}`}
+              />
+              <div className="mt-3 grid gap-2">
+                <FlightDataRow
+                  label="Coordinates"
+                  value={`${drone.position[0].toFixed(5)}, ${drone.position[1].toFixed(5)}`}
+                />
+                <FlightDataRow
+                  label="Heading"
+                  value={`${Math.round(drone.heading_deg ?? 0)} deg true`}
+                />
+                <FlightDataRow
+                  label="Ground speed"
+                  value={`${Math.round(drone.speed_mps ?? 0)} m/s`}
+                />
+                <FlightDataRow
+                  label="Altitude"
+                  value={`${Math.round(drone.altitude_m ?? 0)} m AGL`}
+                />
+                <FlightDataRow
+                  label="Battery"
+                  value={`${drone.battery_pct ?? '--'}%`}
+                />
+                <FlightDataRow
+                  label="Status"
+                  value={(drone.status ?? '—').replace('_', ' ')}
+                />
+                <FlightDataRow
+                  label="Health"
+                  value={(drone.health ?? '—').replace('_', ' ')}
+                />
+              </div>
+            </div>
+          ) : null}
           <div className="p-4">
             <PanelTitle
-              title="Flight data stream"
-              meta={`${drones.length} drones · ${frameId}`}
+              title="Fleet roster"
+              meta={`${drones.length} drones · ${cameraDrones.length} cam`}
             />
             <div className="mt-3 grid gap-2">
-              <FlightDataRow label="Coordinates" value={`${lat}, ${lon}`} />
-              <FlightDataRow label="Heading" value={`${heading} deg true`} />
-              <FlightDataRow label="Ground speed" value={`${speed} m/s`} />
-              <FlightDataRow label="Altitude" value={`${altitude} m AGL`} />
-              <FlightDataRow label="Battery" value={`${battery}% est.`} />
-              <FlightDataRow
-                label="Video"
-                value={`24 fps · ${tick % 6}% loss`}
-              />
-              <FlightDataRow label="Model cue" value="tracklet BOGEY-7 / 87%" />
-              <div className="border-border my-1 border-t" />
               {drones.map((unit) => (
                 <TelemetryRow key={unit._id} unit={unit} />
               ))}
+              {drones.length === 0 ? (
+                <div className="text-muted-foreground py-2 font-mono text-[11px]">
+                  No drones in roster.
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -1370,15 +1374,6 @@ function ActionSurfaceButton({
         {meta}
       </span>
     </button>
-  );
-}
-
-function CameraMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="border-primary/40 bg-background/70 border px-2 py-1.5">
-      <div className="text-muted-foreground text-[9px]">{label}</div>
-      <div className="text-primary font-bold">{value}</div>
-    </div>
   );
 }
 

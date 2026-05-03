@@ -24,7 +24,10 @@ import {
   Zap,
 } from 'lucide-react';
 
-import { DronePovPanel } from '@/components/_columns/drone-pov-panel';
+import {
+  DronePovPanel,
+  hasCameraCapability,
+} from '@/components/_columns/drone-pov-panel';
 import deepStateOccupied from '@/lib/fixtures/deepstate-occupied-20260502.json';
 import type { AnyObject, Entity, LatLon, Unit } from '@/types/ontology';
 import { MAP_VIEWBOX } from '@/types/ontology';
@@ -163,10 +166,7 @@ export function ColMap({ entities, units, selectedId, onSelect }: ColMapProps) {
     if (!selectedId) return null;
     const unit = units.find((u) => u._id === selectedId);
     if (!unit) return null;
-    const hasCamera = unit.capabilities.some((c) =>
-      ['optical', 'eo', 'ir'].includes(c)
-    );
-    return hasCamera ? unit : null;
+    return hasCameraCapability(unit) ? unit : null;
   }, [selectedId, units]);
 
   useEffect(() => {

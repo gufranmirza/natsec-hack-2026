@@ -7,8 +7,6 @@ import {
   FileStack,
   GitBranch,
   Plane,
-  Radio,
-  ShieldCheck,
 } from 'lucide-react';
 
 import { ColCopilot } from '@/components/_columns/col-copilot';
@@ -37,12 +35,6 @@ interface WorkspaceContextRailProps {
   onApprove: (rec: Recommendation) => void;
   onReject: (rec: Recommendation) => void;
   onModify: (rec: Recommendation) => void;
-  /** Forward chat queries through the agent (control-plane → Azure OpenAI). */
-  onAskCopilot?: (text: string) => Promise<string | null>;
-  /** Forward to the global voice handler when the copilot mic is tapped. */
-  onVoiceCommand?: () => void;
-  /** Hint that voice capture is currently armed/listening. */
-  voiceListening?: boolean;
 }
 
 export function WorkspaceContextRail({
@@ -58,9 +50,6 @@ export function WorkspaceContextRail({
   onApprove,
   onReject,
   onModify,
-  onAskCopilot,
-  onVoiceCommand,
-  voiceListening,
 }: WorkspaceContextRailProps) {
   if (workspace === 'awareness') {
     return (
@@ -70,9 +59,6 @@ export function WorkspaceContextRail({
         onApprove={onApprove}
         onReject={onReject}
         onModify={onModify}
-        onAskCopilot={onAskCopilot}
-        onVoiceCommand={onVoiceCommand}
-        voiceListening={voiceListening}
       />
     );
   }
@@ -200,37 +186,27 @@ export function WorkspaceContextRail({
   const onStationCount = units.filter(
     (u) => u._subtype === 'drone' && u.status === 'on_station'
   ).length;
-  const reportSubtypes = new Set(reports.map((r) => r._subtype).filter(Boolean));
+  const reportSubtypes = new Set(
+    reports.map((r) => r._subtype).filter(Boolean)
+  );
   const reportSummary =
     reports.length === 0
       ? 'no reports yet'
       : `${reports.length} · ${Array.from(reportSubtypes).slice(0, 3).join(' / ') || 'mixed'}`;
   const trackedEntities = entities.length;
-  const pendingRecCount = recommendations.filter((r) => r.status === 'pending').length;
+  const pendingRecCount = recommendations.filter(
+    (r) => r.status === 'pending'
+  ).length;
   const decidedRecCount = recommendations.filter(
     (r) => r.status === 'accepted' || r.status === 'rejected'
   ).length;
 
-  // Suggested voice prompts adapt to current state. Pending decisions get
-  // priority; otherwise nudge the operator toward a useful query.
-  const suggestedPrompts: Array<{ icon: typeof Radio; text: string }> = [];
-  if (pendingRecCount > 0) {
-    suggestedPrompts.push({
-      icon: ShieldCheck,
-      text: `Why is the top recommendation pending?`,
-    });
-  }
   const hostiles = entities.filter(
     (e) => e.threat_level === 'high' || e.threat_level === 'med'
   );
-  if (hostiles[0]) {
-    const name = hostiles[0].name ?? hostiles[0]._subtype;
-    suggestedPrompts.push({ icon: Radio, text: `Show me everything about ${name}` });
-  }
-  suggestedPrompts.push({
-    icon: Plane,
-    text: 'Give me an update on the last 10 minutes',
-  });
+
+  // Suggested prompts live in the center IntelligenceSurface — keeping
+  // them out of the rail avoids the duplicate-prompt confusion.
 
   return (
     <ContextShell icon={Brain} title="AI context" meta="mission RAG">
@@ -260,10 +236,10 @@ export function WorkspaceContextRail({
           value={`${events.length} events · ${decidedRecCount} decisions`}
         />
       </Panel>
-      <Panel title="Suggested queries" meta="context-aware">
-        {suggestedPrompts.slice(0, 3).map((p) => (
-          <PromptLine key={p.text} icon={p.icon} text={p.text} />
-        ))}
+      <Panel title="Agent state" meta="azure gpt-4o">
+        <StatusRow label="Endpoint" value="POST /operator/query" />
+        <StatusRow label="Mode" value="grounded SQL · catalog" />
+        <StatusRow label="Voice" value="WebSpeech · TTS reply" />
       </Panel>
     </ContextShell>
   );
@@ -359,21 +335,6 @@ function EventLine({ event }: { event: Event }) {
           {event._source} · {event._observed_at.split('T')[1]?.slice(0, 8)}
         </div>
       </div>
-    </div>
-  );
-}
-
-function PromptLine({
-  icon: Icon,
-  text,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  text: string;
-}) {
-  return (
-    <div className="text-foreground flex items-center gap-2 text-[11px]">
-      <Icon className="text-primary size-3.5 shrink-0" />
-      <span>{text}</span>
     </div>
   );
 }
