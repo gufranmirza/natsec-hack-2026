@@ -523,6 +523,7 @@ function OntologySurface({
           {objects.map((object) => {
             const meta = registryRowMeta(object);
             const Icon = meta.icon;
+            const accent = registryRowAccent(object);
             return (
               <button
                 key={object._id}
@@ -547,8 +548,17 @@ function OntologySurface({
                     {registryRowSubtitle(object)}
                   </span>
                 </span>
-                <span className="border-border text-muted-foreground border px-1.5 py-0.5 font-mono text-[9px]">
-                  {_time(object._observed_at)}
+                <span className="flex shrink-0 items-center gap-1.5">
+                  {accent ? (
+                    <span
+                      className={`rounded-sm border px-1 py-px font-mono text-[9px] uppercase tracking-wide ${accent.tone}`}
+                    >
+                      {accent.label}
+                    </span>
+                  ) : null}
+                  <span className="border-border text-muted-foreground border px-1.5 py-0.5 font-mono text-[9px]">
+                    {_time(object._observed_at)}
+                  </span>
                 </span>
               </button>
             );
@@ -1692,27 +1702,131 @@ function missionMilestones(objective: MissionObjective) {
 }
 
 // registryRowSubtitle returns the small grey line under the object's
-// name in the registry. Always shows the type discriminator + the
-// subtype the icon already encodes — same data the icon carries, in
-// text, so screen readers + keyboard scans still get it. Drops the
-// _source / _version that nobody scans for in this list.
+// name. Surfaces the most useful details per type beyond what the
+// icon already carries — platform class for Entity, role + battery
+// for Unit, channel for Report, etc. Drops the _source / _version
+// that nobody scans for in this list.
 function registryRowSubtitle(object: AnyObject): string {
   switch (object._type) {
-    case 'Entity':
+    case 'Entity': {
+      // Prefer attributes.class (e.g. "T-72B3", "Orlan-10") over the
+      // bare _subtype ("Vehicle"). Falls back to subtype when class
+      // is absent (civilian / pre-OSINT-fetch entities).
+      const cls = object.attributes?.class;
+      return cls ? `${object._subtype} · ${cls}` : object._subtype;
+    }
+    case 'Unit': {
+      // Show role + the most demanded telemetry value (battery first
+      // for drones, fuel for vehicles).
+      const role = object._subtype.replace(/_/g, ' ');
+      const tele =
+        object.battery_pct !== undefined
+          ? `${object.battery_pct}% bat`
+          : object.fuel_pct !== undefined
+            ? `${object.fuel_pct}% fuel`
+            : null;
+      return tele ? `${role} · ${tele}` : role;
+    }
+    case 'Report': {
+      // Channel / author beats bare subtype for radio + sigint chatter
+      // ("radio · LIGHTNING / FIRES-NET" reads more meaningfully than
+      // "Report · radio").
+      const author = object.author ?? object.channel;
+      return author
+        ? `${object._subtype} · ${author}`
+        : object._subtype;
+    }
     case 'Event':
-    case 'Report':
-    case 'Unit':
-      return `${object._type} · ${object._subtype}`;
+      return `${object._subtype} · ${object.severity}`;
     case 'Recommendation':
-      return `Recommendation · ${object.status}`;
+      return `${object.proposed_action_type} · ${(object.confidence * 100).toFixed(0)}%`;
     case 'MissionObjective':
-      return `MissionObjective · ${object.priority}`;
+      return `${object.priority} · ${object.status}`;
     case 'Plan':
       return `Plan · ${object.status}`;
     case 'Mission':
       return `Mission · ${object.status}`;
     case 'TaskingOrder':
-      return `TaskingOrder · ${object.status}`;
+      return `${object.command_type} · ${object.status}`;
+  }
+}
+
+// registryRowAccent returns the small inline state pill (right side
+// of the row, before the time stamp). undefined → no pill rendered.
+// Tone semantics match col-status: threat=red, warning=amber,
+// success=green, primary=blue, muted=grey.
+function registryRowAccent(object: AnyObject):
+  | { label: string; tone: string }
+  | undefined {
+  switch (object._type) {
+    case 'Entity':
+      return {
+        label: object.threat_level,
+        tone:
+          object.threat_level === 'high'
+            ? 'border-threat/50 text-threat'
+            : object.threat_level === 'med'
+              ? 'border-warning/50 text-warning'
+              : 'border-muted-foreground/30 text-muted-foreground/80',
+      };
+    case 'Unit':
+      return {
+        label: object.status.replace(/_/g, ' '),
+        tone:
+          object.status === 'on_station'
+            ? 'border-success/40 text-success/90'
+            : object.status === 'en_route'
+              ? 'border-warning/40 text-warning/90'
+              : object.status === 'returning'
+                ? 'border-primary/40 text-primary/90'
+                : object.status === 'offline'
+                  ? 'border-threat/40 text-threat/90'
+                  : 'border-muted-foreground/30 text-muted-foreground',
+      };
+    case 'Event':
+      return {
+        label: object.severity,
+        tone:
+          object.severity === 'critical'
+            ? 'border-threat/50 text-threat'
+            : object.severity === 'warn'
+              ? 'border-warning/50 text-warning'
+              : 'border-muted-foreground/30 text-muted-foreground/80',
+      };
+    case 'Report':
+      return {
+        label: object.classification,
+        tone:
+          object.classification === 'confidential'
+            ? 'border-threat/50 text-threat'
+            : object.classification === 'cui'
+              ? 'border-warning/40 text-warning/90'
+              : 'border-muted-foreground/30 text-muted-foreground/80',
+      };
+    case 'Recommendation':
+      return {
+        label: object.status,
+        tone:
+          object.status === 'accepted'
+            ? 'border-success/40 text-success/90'
+            : object.status === 'rejected'
+              ? 'border-threat/50 text-threat'
+              : object.status === 'expired'
+                ? 'border-muted-foreground/30 text-muted-foreground'
+                : 'border-primary/40 text-primary/90',
+      };
+    case 'MissionObjective':
+      return {
+        label: object.status,
+        tone:
+          object.status === 'active'
+            ? 'border-success/40 text-success/90'
+            : object.status === 'open'
+              ? 'border-primary/40 text-primary/90'
+              : 'border-muted-foreground/30 text-muted-foreground/80',
+      };
+    default:
+      return undefined;
   }
 }
 
