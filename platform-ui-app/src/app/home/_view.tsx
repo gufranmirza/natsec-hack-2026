@@ -27,6 +27,10 @@ import { ObjectDrawer } from '@/components/_layout/object-drawer';
 import { OpStatusBar } from '@/components/_layout/op-status-bar';
 import { buildAiSuggestions } from '@/lib/ai-suggestions';
 import { ACTIVE_MISSION_ID } from '@/lib/fixtures';
+import {
+  type ScenarioHandle,
+  startUnknownContactScenario,
+} from '@/lib/scenarios/unknown-contact';
 import { normalizeRecommendation } from '@/services/cp/recommendations/recommendations-api';
 import { useDemoData } from '@/services/cp/use-demo-data';
 import type {
@@ -271,6 +275,54 @@ export function HomeView() {
     return () => window.clearInterval(id);
   }, [seed.live]);
 
+  // unknown-contact scenario — fires once per session ~10s after the
+  // first units poll completes. Walks ROOK-1 (or the first camera-
+  // equipped drone) to a fixed target near the AO, persisting every
+  // milestone to CP so the agent can later answer SITREP questions.
+  const scenarioStartedRef = useRef(false);
+  const scenarioHandleRef = useRef<ScenarioHandle | null>(null);
+  useEffect(() => {
+    if (scenarioStartedRef.current) return;
+    if (units.length === 0) return;
+    const camDrone =
+      units.find((u) => u._id === 'unit_rook1') ??
+      units.find(
+        (u) =>
+          (u._subtype === 'drone' ||
+            u._subtype === 'drone_isr' ||
+            u._subtype === 'drone_strike') &&
+          (u.capabilities ?? []).some((c) =>
+            ['optical', 'eo', 'ir'].includes(c)
+          )
+      );
+    if (!camDrone) return;
+    scenarioStartedRef.current = true;
+    const timer = window.setTimeout(() => {
+      scenarioHandleRef.current = startUnknownContactScenario({
+        drone: camDrone,
+        // Fixed target a short distance from the AO so transit is
+        // visible without scrolling. Same lat/lon every run so the
+        // agent can answer "what did ROOK-1 find at 48.79°N 37.84°E?"
+        // deterministically.
+        target: [48.79, 37.84],
+        contactName: 'UNK-DELTA',
+        hooks: {
+          setEntities,
+          setUnits,
+          setEvents,
+          setReports,
+          setRecommendations,
+        },
+      });
+    }, 10_000);
+    return () => {
+      window.clearTimeout(timer);
+      scenarioHandleRef.current?.abort();
+      scenarioHandleRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [units.length > 0]);
+
   // For v1 only OP SILENT EYE has full fixture data. Switching to
   // another tab updates chrome (tab highlight, status bar Op code,
   // objective banner) but leaves the live-data columns populated
@@ -384,6 +436,15 @@ export function HomeView() {
 
   const handleApproveRecommendation = useCallback(
     (rec: Recommendation) => {
+      // Scenario-authored rec: hand back to the scenario engine so it
+      // can advance through approve → transit → arrive_analyze and
+      // persist the milestones itself. Skip the generic approval path
+      // below — the scenario writes its own approval Event +
+      // Recommendation update.
+      if (rec._source === 'scenario:unknown-contact') {
+        scenarioHandleRef.current?.approve();
+        return;
+      }
       const unitId = String(rec.proposed_params.unit_id ?? '');
       const targetId = String(rec.proposed_params.target_entity_id ?? '');
 
@@ -908,10 +969,13 @@ export function HomeView() {
       // answers render on the AI Intelligence surface — auto-switch so
       // operators see the result of what they just asked.
       setWorkspace('intelligence');
-      submitMissionQuery(query, voiceArmed);
+      // Typed Asks are never voice — TTS playback only fires on the
+      // recognition.onresult path. Pass false so a stale voiceArmed
+      // doesn't bleed into a typed query and start the model speaking.
+      submitMissionQuery(query, false);
       setQuery('');
     },
-    [query, submitMissionQuery, voiceArmed]
+    [query, submitMissionQuery]
   );
 
   const recognitionRef = useRef<VoiceRecognition | null>(null);
@@ -939,10 +1003,15 @@ export function HomeView() {
   }, []);
 
   const handleVoiceCommand = useCallback(() => {
-    // Toggle: tap-while-listening = abort current capture.
+    // Toggle: tap-while-listening = abort current capture. Also kill any
+    // queued TTS so a long previous reply stops speaking.
     if (voiceListeningRef.current && recognitionRef.current) {
       try { recognitionRef.current.abort(); } catch { /* noop */ }
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        try { window.speechSynthesis.cancel(); } catch { /* noop */ }
+      }
       setVoiceListening(false);
+      setVoiceArmed(false);
       setVoiceTranscript('Cancelled.');
       return;
     }
@@ -980,20 +1049,27 @@ export function HomeView() {
         setVoiceTranscript(trimmed);
         setQuery(trimmed);
         submitMissionQuery(trimmed, true);
+        // Disarm immediately on the final result so any subsequent
+        // typed query / programmatic call doesn't get treated as voice
+        // (which would otherwise auto-trigger TTS playback).
+        setVoiceArmed(false);
       } else if (interim) {
         setVoiceTranscript(interim.trim() + '…');
       }
     };
     recognition.onerror = (event) => {
       setVoiceListening(false);
+      setVoiceArmed(false);
       const msg = VOICE_ERROR_MESSAGES[event.error] ?? `Voice error: ${event.error}`;
       if (msg) setVoiceTranscript(msg);
     };
     recognition.onnomatch = () => {
+      setVoiceArmed(false);
       setVoiceTranscript('Did not catch that — try again.');
     };
     recognition.onend = () => {
       setVoiceListening(false);
+      setVoiceArmed(false);
     };
 
     try {
@@ -1008,11 +1084,17 @@ export function HomeView() {
     }
   }, [ensureRecognition, submitMissionQuery, commandBarPrompts]);
 
-  // Clean up the recognition session if the page unmounts mid-listen.
+  // Clean up the recognition session AND any queued TTS if the page
+  // unmounts mid-listen — otherwise React StrictMode's dev-mode double
+  // mount can leave a SpeechSynthesisUtterance queued and the model
+  // appears to "start speaking by itself" on reload.
   useEffect(() => {
     return () => {
       if (recognitionRef.current) {
         try { recognitionRef.current.abort(); } catch { /* noop */ }
+      }
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        try { window.speechSynthesis.cancel(); } catch { /* noop */ }
       }
     };
   }, []);
