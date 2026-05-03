@@ -174,8 +174,6 @@ export function WorkspaceCenter({
     <ColMap
       entities={entities}
       units={units}
-      events={events}
-      recommendations={recommendations}
       selectedId={selectedId}
       onSelect={onSelect}
     />
@@ -953,22 +951,67 @@ function IntelligenceSurface({
           </div>
         </div>
         <div className="bg-background min-h-0 overflow-y-auto p-4">
-          <PanelTitle title="Current synthesis" meta="real-time" />
+          <PanelTitle title="Current synthesis" meta="derived from feeds" />
           <div className="mt-3 grid gap-3">
             <InsightBlock
               icon={Radar}
               title="Most important change"
-              value="BOGEY-7 persisted across EO, RF, and OSINT cues inside the last 10 minutes."
+              value={
+                (() => {
+                  const lastCritical = events.find(
+                    (e) => e.severity === 'critical' || e.severity === 'warn'
+                  );
+                  if (lastCritical) {
+                    return lastCritical.description ?? lastCritical._subtype;
+                  }
+                  if (events.length > 0) {
+                    return `${events.length} events streaming · last: ${events[0]?._subtype ?? 'unknown'}`;
+                  }
+                  return 'No events ingested yet.';
+                })()
+              }
             />
             <InsightBlock
               icon={Plane}
               title="Best next ISR action"
-              value="ROOK-1 stand-off overwatch; ROOK-2 remains offset confirmation."
+              value={
+                (() => {
+                  const topPending = recommendations.find(
+                    (r) => r.status === 'pending'
+                  );
+                  if (topPending) {
+                    const conf = Math.round((topPending.confidence ?? 0) * 100);
+                    return `${topPending.short ?? topPending.proposed_action_type} · ${conf}% confidence`;
+                  }
+                  const onStation = units.filter(
+                    (u) => u._subtype === 'drone' && u.status === 'on_station'
+                  ).length;
+                  return onStation > 0
+                    ? `${onStation} drone${onStation > 1 ? 's' : ''} on station — no pending tasking`
+                    : 'No drones on station, nothing pending.';
+                })()
+              }
             />
             <InsightBlock
               icon={ShieldCheck}
               title="Human decision required"
-              value="Approve the recommendation before drone tasking mutates mission state."
+              value={
+                (() => {
+                  const pendingCount = recommendations.filter(
+                    (r) => r.status === 'pending'
+                  ).length;
+                  if (pendingCount > 0) {
+                    return `${pendingCount} recommendation${pendingCount > 1 ? 's' : ''} awaiting approval.`;
+                  }
+                  const acceptedRecent = recommendations.filter(
+                    (r) => r.status === 'accepted'
+                  ).length;
+                  if (acceptedRecent > 0) {
+                    return `All clear — ${acceptedRecent} action${acceptedRecent > 1 ? 's' : ''} approved this mission.`;
+                  }
+                  return 'No decisions outstanding.';
+                })()
+              }
             />
           </div>
         </div>
@@ -1634,8 +1677,16 @@ function objectName(object: AnyObject) {
       return object.callsign;
     case 'Report':
       return object._source_ref ?? object._id;
-    case 'Event':
-      return object.verb ?? object._subtype;
+    // Events: show "<subtype> — <first 40 chars of description>" so the
+    // row carries what HAPPENED instead of just the verb shouter
+    // ("Reported.", "Lost."). Subtype alone (e.g. "withdrawal",
+    // "track_lost", "artillery_impact") is the meaningful identity;
+    // the description tail is the gist.
+    case 'Event': {
+      const desc = object.description?.trim() ?? '';
+      const tail = desc.length > 40 ? `${desc.slice(0, 40)}…` : desc;
+      return tail ? `${object._subtype} — ${tail}` : object._subtype;
+    }
     case 'Recommendation':
       return `${object.verb} ${object.short}`;
     case 'MissionObjective':

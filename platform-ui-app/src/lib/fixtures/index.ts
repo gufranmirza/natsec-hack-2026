@@ -52,8 +52,13 @@ export function displayName(o: AnyObject): string {
       return o.intent.slice(0, 40);
     case 'Report':
       return `${o.author ?? 'Report'} · ${o._subtype}`;
-    case 'Event':
-      return o.verb ?? o._subtype;
+    case 'Event': {
+      // Show "<subtype> — <gist>" so the row says what HAPPENED.
+      // Bare verb ("Reported.", "Lost.") doesn't identify the event.
+      const desc = o.description?.trim() ?? '';
+      const tail = desc.length > 40 ? `${desc.slice(0, 40)}…` : desc;
+      return tail ? `${o._subtype} — ${tail}` : o._subtype;
+    }
     case 'Recommendation':
       return `${o.verb} ${o.short}`;
     case 'TaskingOrder':

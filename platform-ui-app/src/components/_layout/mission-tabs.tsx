@@ -96,8 +96,16 @@ function MissionTab({
         className="flex flex-1 items-center gap-2 truncate pl-3 pr-2 text-left"
       >
         <span aria-hidden className={`size-1.5 shrink-0 ${dot}`} />
-        <span className="text-muted-foreground/80 label-cap-sm shrink-0">
-          {mission._source_ref ?? mission._id.slice(-3)}
+        <span
+          className={`shrink-0 rounded-sm border px-1 py-px font-mono text-[9px] uppercase tracking-wide ${
+            mission.priority === 'P0'
+              ? 'border-threat/50 text-threat'
+              : mission.priority === 'P1'
+                ? 'border-warning/50 text-warning'
+                : 'border-muted-foreground/40 text-muted-foreground'
+          }`}
+        >
+          {mission.priority}
         </span>
         <span
           className={`truncate font-mono text-[11px] ${active ? 'text-foreground font-bold' : ''}`}

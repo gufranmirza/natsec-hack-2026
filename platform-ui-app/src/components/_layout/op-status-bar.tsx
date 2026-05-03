@@ -86,7 +86,10 @@ export function OpStatusBar(props: OpStatusBarProps) {
       </nav>
 
       <div className="divide-border grid min-w-0 flex-1 grid-cols-8 divide-x">
-        <Cell label="Op" value={missionId} />
+        <Cell
+          label="Op"
+          value={missions.find((m) => m._id === missionId)?.title ?? missionId}
+        />
         <Cell label="UTC" value={utcTime} />
         <Cell label="Elapsed" value={missionElapsed} />
         <Cell
