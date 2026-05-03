@@ -12,12 +12,16 @@ import {
   Send,
 } from 'lucide-react';
 
-import { ColCopilot } from '@/components/_columns/col-copilot';
-import { ColMap } from '@/components/_columns/col-map';
 import {
   ColStatus,
   type WorkspaceSectionId,
 } from '@/components/_columns/col-status';
+import {
+  type DataSourceId,
+  LiveFeedStrip,
+  WorkspaceCenter,
+} from '@/components/_columns/workspace-center';
+import { WorkspaceContextRail } from '@/components/_columns/workspace-context-rail';
 import { ObjectDrawer } from '@/components/_layout/object-drawer';
 import { OpStatusBar } from '@/components/_layout/op-status-bar';
 import {
@@ -36,6 +40,26 @@ import type {
   Report,
   Unit,
 } from '@/types/ontology';
+
+interface VoiceRecognitionResult {
+  readonly results: {
+    readonly [index: number]: {
+      readonly [index: number]: { readonly transcript: string };
+    };
+  };
+}
+
+interface VoiceRecognition {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: VoiceRecognitionResult) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+}
+
+type VoiceRecognitionCtor = new () => VoiceRecognition;
 
 const WORKSPACES: Array<{
   id: WorkspaceSectionId;
@@ -74,6 +98,13 @@ export function HomeView() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [voiceArmed, setVoiceArmed] = useState(false);
+  const [voiceListening, setVoiceListening] = useState(false);
+  const [voiceTranscript, setVoiceTranscript] = useState(
+    'Try: give me an update on the last 10 minutes'
+  );
+  const [activeFeedSource, setActiveFeedSource] =
+    useState<DataSourceId>('radio');
+  const [activeDroneFeed, setActiveDroneFeed] = useState<string | undefined>();
 
   const activeMission =
     MISSIONS.find((m) => m._id === activeMissionId) ?? MISSIONS[0];
@@ -151,9 +182,9 @@ export function HomeView() {
         verb: 'Approved.',
       });
 
-      handleSelect({ ...rec, status: 'accepted' });
+      setSelected({ ...rec, status: 'accepted' });
     },
-    [appendEvent, handleSelect]
+    [appendEvent]
   );
 
   const handleRejectRecommendation = useCallback((rec: Recommendation) => {
@@ -214,6 +245,7 @@ export function HomeView() {
         payload: { action: 'launch_drone', autonomy: 'supervised' },
         verb: 'Launched.',
       });
+      setActiveDroneFeed(unitId);
       setWorkspace('drone_ops');
     },
     [activeMission._id, appendEvent, units]
@@ -249,61 +281,80 @@ export function HomeView() {
       },
       verb: 'Coordinated.',
     });
+    setActiveDroneFeed('unit_rook1');
     setWorkspace('drone_ops');
   }, [activeMission._id, appendEvent]);
 
   const handleInjectFeed = useCallback(
     (source: string) => {
+      const sourceId = (
+        [
+          'radio',
+          'satellite',
+          'intel',
+          'social',
+          'allies',
+          'drone_video',
+        ].includes(source)
+          ? source
+          : 'radio'
+      ) as DataSourceId;
       const now = new Date().toISOString();
       const copy =
-        source === 'radio'
+        sourceId === 'radio'
           ? 'TAC-3 radio burst: "engine noise east of treeline, possible launch team moving toward DQ-842."'
-          : source === 'satellite'
+          : sourceId === 'satellite'
             ? 'Satellite change detection: new vehicle scar and heat residue 420m east of last BOGEY-7 track.'
-            : source === 'intel'
+            : sourceId === 'intel'
               ? 'Intel report: logistics cell likely probing route between Kramatorsk and Sloviansk in next 30m.'
-              : source === 'allies'
+              : sourceId === 'allies'
                 ? 'Allied liaison feed: counter-UAS radar saw intermittent low-altitude return aligned with ROOK-1 track.'
-                : 'Public/social cue: local post reports low aircraft noise and lights moving south-west near Kramatorsk.';
+                : sourceId === 'drone_video'
+                  ? 'Drone video tracklet: ROOK-1 EO/IR sees heat trace and vehicle scar aligned with BOGEY-7 track.'
+                  : 'Public/social cue: local post reports low aircraft noise and lights moving south-west near Kramatorsk.';
 
       const report: Report = {
         _type: 'Report',
-        _id: `rep_${source}_${Date.now()}`,
+        _id: `rep_${sourceId}_${Date.now()}`,
         _version: 1,
         _observed_at: now,
         _ingested_at: now,
-        _source: source,
-        _source_ref: source.toUpperCase(),
+        _source: sourceId,
+        _source_ref: sourceId.toUpperCase(),
         _subtype:
-          source === 'radio'
+          sourceId === 'radio'
             ? 'radio'
-            : source === 'intel'
+            : sourceId === 'intel'
               ? 'operator'
-              : source === 'satellite'
+              : sourceId === 'satellite'
                 ? 'sigint'
-                : source === 'allies'
+                : sourceId === 'allies'
                   ? 'sigint'
                   : 'osint',
-        author: `${source.toUpperCase()} feed`,
+        author: `${sourceId.toUpperCase()} feed`,
         channel: 'simulated integration',
         text: copy,
         entity_refs: ['ent_bogey7'],
-        classification: source === 'social' ? 'unclass' : 'cui',
+        classification: sourceId === 'social' ? 'unclass' : 'cui',
       };
 
       setReports((current) => [report, ...current]);
       appendEvent({
-        _id: `evt_ingest_${source}_${Date.now()}`,
+        _id: `evt_ingest_${sourceId}_${Date.now()}`,
         _observed_at: now,
         _ingested_at: now,
-        _source: source,
-        _subtype: source === 'radio' ? 'report_link' : 'anomaly',
+        _source: sourceId,
+        _subtype: sourceId === 'radio' ? 'report_link' : 'anomaly',
         entity_id: 'ent_bogey7',
-        severity: source === 'satellite' ? 'warn' : 'info',
+        severity:
+          sourceId === 'satellite' || sourceId === 'drone_video'
+            ? 'warn'
+            : 'info',
         description: copy,
-        payload: { source, report_id: report._id, simulated: true },
+        payload: { source: sourceId, report_id: report._id, simulated: true },
         verb: 'Ingested.',
       });
+      setActiveFeedSource(sourceId);
       setWorkspace('integrations');
     },
     [appendEvent]
@@ -325,23 +376,38 @@ export function HomeView() {
     setWorkspace('planning');
   }, [appendEvent]);
 
-  const handleQuerySubmit = useCallback(
-    (e: React.FormEvent<HTMLFormElement>) => {
-      e.preventDefault();
-      const trimmed = query.trim();
+  const submitMissionQuery = useCallback(
+    (rawQuery: string, fromVoice = false) => {
+      const trimmed = rawQuery.trim();
       if (!trimmed) return;
+
+      const lower = trimmed.toLowerCase();
+      if (lower.includes('swarm')) {
+        handleLaunchSwarm();
+      } else if (
+        lower.includes('launch') &&
+        (lower.includes('drone') || lower.includes('rook'))
+      ) {
+        handleLaunchDrone('unit_rook1');
+      } else if (lower.includes('fuse') || lower.includes('data')) {
+        setWorkspace('integrations');
+      } else if (lower.includes('plan') || lower.includes('coa')) {
+        handleGeneratePlan();
+      } else {
+        setWorkspace('intelligence');
+      }
 
       appendEvent({
         _id: `evt_query_${Date.now()}`,
         _observed_at: new Date().toISOString(),
         _ingested_at: new Date().toISOString(),
-        _source: voiceArmed ? 'voice-query' : 'natural-language-query',
+        _source: fromVoice ? 'voice-query' : 'natural-language-query',
         _subtype: 'report_link',
         severity: 'info',
         description: `Commander query answered across ${units.length} units, ${reports.length} reports, ${events.length} events, DeepState terrain, and live recommendations: "${trimmed}"`,
         payload: {
           query: trimmed,
-          voice: voiceArmed,
+          voice: fromVoice,
           sources: [
             'drones',
             'radio',
@@ -353,18 +419,65 @@ export function HomeView() {
         },
         verb: 'Answered.',
       });
-      setWorkspace('intelligence');
-      setQuery('');
+      setVoiceTranscript(trimmed);
     },
     [
       appendEvent,
       events.length,
-      query,
+      handleGeneratePlan,
+      handleLaunchDrone,
+      handleLaunchSwarm,
       reports.length,
       units.length,
-      voiceArmed,
     ]
   );
+
+  const handleQuerySubmit = useCallback(
+    (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      submitMissionQuery(query, voiceArmed);
+      setQuery('');
+    },
+    [query, submitMissionQuery, voiceArmed]
+  );
+
+  const handleVoiceCommand = useCallback(() => {
+    setVoiceArmed(true);
+    const speechWindow = window as unknown as {
+      SpeechRecognition?: VoiceRecognitionCtor;
+      webkitSpeechRecognition?: VoiceRecognitionCtor;
+    };
+    const Recognition =
+      speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
+
+    if (!Recognition) {
+      const fallback =
+        'Give me an update on everything that happened last 10 minutes';
+      setVoiceTranscript(fallback);
+      submitMissionQuery(fallback, true);
+      return;
+    }
+
+    const recognition = new Recognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+    recognition.onresult = (event) => {
+      const transcript = event.results[0]?.[0]?.transcript ?? '';
+      if (transcript) {
+        setVoiceTranscript(transcript);
+        setQuery(transcript);
+        submitMissionQuery(transcript, true);
+      }
+    };
+    recognition.onerror = () => {
+      setVoiceListening(false);
+      setVoiceTranscript('Voice capture failed. Try: launch ROOK-1.');
+    };
+    recognition.onend = () => setVoiceListening(false);
+    setVoiceListening(true);
+    recognition.start();
+  }, [submitMissionQuery]);
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
@@ -391,42 +504,70 @@ export function HomeView() {
         className="border-border bg-background flex shrink-0 items-stretch gap-px border-b"
       >
         <div className="bg-card hidden w-[76px] items-center justify-center border-r lg:flex">
-          <span className="label-cap-sm text-muted-foreground">Query</span>
+          <span className="label-cap-sm text-muted-foreground">Command</span>
         </div>
-        <div className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2">
-          <div className="border-border bg-muted/30 flex min-w-0 flex-1 items-center gap-2 border px-2.5 py-1.5">
-            <Brain className="text-primary size-4 shrink-0" />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              className="text-foreground placeholder:text-muted-foreground/70 min-w-0 flex-1 bg-transparent font-mono text-[12px] outline-none"
-              placeholder="Ask mission AI across drones, DeepState, radio, satellite, reports, OSINT, objects..."
-            />
+        <div className="bg-border grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_220px] gap-px">
+          <div className="bg-background flex min-w-0 flex-col gap-2 px-3 py-2">
+            <div className="border-border bg-muted/30 flex min-w-0 flex-1 items-center gap-2 border px-2.5 py-2">
+              <Brain className="text-primary size-4 shrink-0" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                className="text-foreground placeholder:text-muted-foreground/70 min-w-0 flex-1 bg-transparent font-mono text-[12px] outline-none"
+                placeholder="Ask across drones, DeepState, radio, satellite, reports, OSINT, objects, plans..."
+              />
+              <button
+                type="submit"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 flex h-8 items-center gap-1.5 px-3 font-mono text-[11px] font-semibold"
+              >
+                <Send className="size-3.5" />
+                Ask
+              </button>
+            </div>
+            <div className="flex min-w-0 gap-1 overflow-x-auto">
+              {[
+                'Give me an update on the last 10 minutes',
+                'Launch ROOK-1 to investigate',
+                'What evidence supports this recommendation?',
+              ].map((prompt) => (
+                <button
+                  key={prompt}
+                  type="button"
+                  onClick={() => submitMissionQuery(prompt, false)}
+                  className="border-border bg-card hover:bg-secondary text-muted-foreground shrink-0 border px-2 py-1 font-mono text-[10px]"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
           </div>
           <button
             type="button"
-            onClick={() => setVoiceArmed((current) => !current)}
+            onClick={handleVoiceCommand}
             className={[
-              'border-border grid size-8 place-items-center border',
-              voiceArmed
+              'flex flex-col items-start justify-center gap-1 px-3 text-left transition-colors',
+              voiceListening
                 ? 'bg-primary text-primary-foreground'
-                : 'bg-card hover:bg-secondary',
+                : voiceArmed
+                  ? 'bg-primary/15 text-primary hover:bg-primary/20'
+                  : 'bg-card text-muted-foreground hover:bg-secondary',
             ].join(' ')}
-            aria-label="Toggle voice control"
+            aria-label="Start voice command"
           >
-            <Mic className="size-4" />
-          </button>
-          <button
-            type="submit"
-            className="bg-primary text-primary-foreground hover:bg-primary/90 flex h-8 items-center gap-1.5 px-3 font-mono text-[11px] font-semibold"
-          >
-            <Send className="size-3.5" />
-            Ask
+            <span className="flex items-center gap-2 font-mono text-[11px] font-bold">
+              <Mic className="size-4" />
+              {voiceListening ? 'LISTENING' : 'VOICE COMMAND'}
+            </span>
+            <span className="line-clamp-2 text-[10px] leading-snug">
+              {voiceTranscript}
+            </span>
           </button>
         </div>
       </form>
 
-      <main className="bg-border grid min-h-0 flex-1 grid-cols-1 gap-px overflow-y-auto lg:grid-cols-[76px_320px_minmax(0,1fr)_380px] lg:grid-rows-1 lg:overflow-hidden">
+      <LiveFeedStrip events={events} onSelect={handleSelect} />
+
+      <main className="bg-border grid min-h-0 flex-1 grid-cols-1 gap-px overflow-y-auto lg:grid-cols-[76px_320px_minmax(0,1fr)_360px] lg:grid-rows-1 lg:overflow-hidden">
         <WorkspaceRail
           active={workspace}
           onSelect={setWorkspace}
@@ -453,18 +594,37 @@ export function HomeView() {
 
         {/* CENTER — observe (map, the hero) */}
         <div className="order-1 min-h-[480px] overflow-hidden lg:order-2 lg:min-h-0">
-          <ColMap
+          <WorkspaceCenter
+            workspace={workspace}
+            objective={activeMission}
             entities={isLiveTab ? ENTITIES : []}
             units={isLiveTab ? units : []}
+            events={isLiveTab ? events : []}
+            reports={isLiveTab ? reports : []}
+            recommendations={isLiveTab ? recommendations : []}
             selectedId={selected?._id}
+            activeFeedSource={activeFeedSource}
+            activeDroneFeed={activeDroneFeed}
             onSelect={handleSelect}
+            onInjectFeed={handleInjectFeed}
+            onLaunchDrone={handleLaunchDrone}
+            onLaunchSwarm={handleLaunchSwarm}
+            onGeneratePlan={handleGeneratePlan}
+            onAsk={submitMissionQuery}
           />
         </div>
 
         {/* RIGHT — decide + act (copilot) */}
         <div className="order-3 min-h-[560px] overflow-hidden lg:min-h-0">
-          <ColCopilot
+          <WorkspaceContextRail
+            workspace={workspace}
+            entities={isLiveTab ? ENTITIES : []}
+            units={isLiveTab ? units : []}
+            events={isLiveTab ? events : []}
+            reports={isLiveTab ? reports : []}
             recommendations={isLiveTab ? recommendations : []}
+            activeFeedSource={activeFeedSource}
+            activeDroneFeed={activeDroneFeed}
             onSelect={handleSelect}
             onApprove={handleApproveRecommendation}
             onReject={handleRejectRecommendation}

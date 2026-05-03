@@ -252,6 +252,11 @@ function RecommendationCard({
           </Button>
         </div>
       </div>
+      {rec.status === 'accepted' ? (
+        <div className="border-success/50 bg-success/10 text-success mt-2 border px-2 py-1 text-center font-mono text-[10px] font-bold uppercase">
+          Approved · command written to mission audit
+        </div>
+      ) : null}
     </Card>
   );
 }

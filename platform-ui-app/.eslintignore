@@ -3,5 +3,9 @@ dist/*
 public
 node_modules
 *.esm.js
+**/* 2.ts
+**/* 2.tsx
+**/* 3.ts
+**/* 3.tsx
 ./src/components/ui/*
 ./src/components/hooks/*
