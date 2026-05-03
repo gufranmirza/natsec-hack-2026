@@ -48,3 +48,39 @@ function normalizeUnit(raw: Unit): Unit {
   }
   return raw;
 }
+
+// putUnits writes (upserts) one or more Unit rows via the ingest batch
+// endpoint. CP uses ReplacingMergeTree — re-posting with a higher
+// `_version` replaces the row on next merge. Used by the unknown-contact
+// scenario to walk a drone toward a target by ticking position updates.
+export const putUnits = async (
+  units: Unit[],
+  token?: string,
+): Promise<void> => {
+  await apiClient<unknown>(
+    '/api/v1/ingest/units',
+    {
+      method: 'POST',
+      body: JSON.stringify(units.map(denormalizeUnit)),
+    },
+    token,
+  );
+};
+
+function denormalizeUnit(unit: Unit): unknown {
+  // Strip the UI-only `position` tuple back into wire-shape `lat`/`lon`.
+  // The UI ontology also carries a `health` field that the CP wire
+  // schema doesn't have — drop it before posting so ClickHouse doesn't
+  // see an unknown column.
+  const { position, ...rest } = unit as Unit & {
+    position?: unknown;
+    health?: unknown;
+  };
+  const wire = rest as Record<string, unknown>;
+  delete wire.health;
+  if (Array.isArray(position) && position.length === 2) {
+    wire.lat = position[0];
+    wire.lon = position[1];
+  }
+  return wire;
+}

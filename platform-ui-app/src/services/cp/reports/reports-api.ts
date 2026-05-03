@@ -35,3 +35,20 @@ export const getReport = async (id: string, token?: string): Promise<Report> => 
     token,
   );
 };
+
+// putReports writes (upserts) one or more Report rows via the ingest
+// batch endpoint. Used by the unknown-contact scenario to attach the
+// drone's SITREP analysis after it arrives at the target (Phase 5).
+export const putReports = async (
+  reports: Report[],
+  token?: string,
+): Promise<void> => {
+  await apiClient<unknown>(
+    '/api/v1/ingest/reports',
+    {
+      method: 'POST',
+      body: JSON.stringify(reports),
+    },
+    token,
+  );
+};

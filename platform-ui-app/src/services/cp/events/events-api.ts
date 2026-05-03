@@ -56,3 +56,37 @@ function normalizeEvent(raw: Event): Event {
   }
   return raw;
 }
+
+// putEvents writes (upserts) one or more Event rows via the ingest
+// batch endpoint. CP wire schema requires `payload` to be a JSON
+// string, so we stringify any object-shaped payload before posting.
+export const putEvents = async (
+  events: Event[],
+  token?: string,
+): Promise<void> => {
+  await apiClient<unknown>(
+    '/api/v1/ingest/events',
+    {
+      method: 'POST',
+      body: JSON.stringify(events.map(denormalizeEvent)),
+    },
+    token,
+  );
+};
+
+function denormalizeEvent(event: Event): unknown {
+  const { position, payload, ...rest } = event as Event & {
+    position?: unknown;
+    payload?: unknown;
+  };
+  const wire = rest as Record<string, unknown>;
+  if (Array.isArray(position) && position.length === 2) {
+    wire.lat = position[0];
+    wire.lon = position[1];
+  }
+  // CP `payload` column is String; UI hands us either an object or a
+  // pre-stringified blob. Normalize to string here.
+  wire.payload =
+    typeof payload === 'string' ? payload : JSON.stringify(payload ?? {});
+  return wire;
+}

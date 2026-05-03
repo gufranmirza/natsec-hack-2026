@@ -50,6 +50,39 @@ export const getRecommendation = async (
   return normalizeRecommendation(rec);
 };
 
+// putRecommendations writes (upserts) one or more Recommendation rows
+// via the ingest batch endpoint. CP wire schema requires
+// `proposed_params` as a JSON string; we stringify before posting and
+// strip the UI-only display helpers (verb / short / gating / why) that
+// don't exist on the CP column list.
+export const putRecommendations = async (
+  recommendations: Recommendation[],
+  token?: string,
+): Promise<void> => {
+  await apiClient<unknown>(
+    '/api/v1/ingest/recommendations',
+    {
+      method: 'POST',
+      body: JSON.stringify(recommendations.map(denormalizeRecommendation)),
+    },
+    token,
+  );
+};
+
+function denormalizeRecommendation(rec: Recommendation): unknown {
+  const wire = { ...rec } as Record<string, unknown>;
+  delete wire.verb;
+  delete wire.short;
+  delete wire.gating;
+  delete wire.why;
+  delete wire.eta;
+  delete wire.asset_callsign;
+  if (typeof wire.proposed_params !== 'string') {
+    wire.proposed_params = JSON.stringify(wire.proposed_params ?? {});
+  }
+  return wire;
+}
+
 // ──────────────────────────────────────────────────────────────────
 // Wire→UI normalizer
 //

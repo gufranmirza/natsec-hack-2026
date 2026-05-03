@@ -51,3 +51,31 @@ function normalizeEntity(raw: Entity): Entity {
   }
   return raw;
 }
+
+// putEntities writes (upserts) one or more Entity rows via the ingest
+// batch endpoint. Used by the unknown-contact scenario to spawn the new
+// contact (Phase 1) and to upgrade its classification once the drone
+// has analyzed the scene (Phase 5).
+export const putEntities = async (
+  entities: Entity[],
+  token?: string,
+): Promise<void> => {
+  await apiClient<unknown>(
+    '/api/v1/ingest/entities',
+    {
+      method: 'POST',
+      body: JSON.stringify(entities.map(denormalizeEntity)),
+    },
+    token,
+  );
+};
+
+function denormalizeEntity(entity: Entity): unknown {
+  const { position, ...rest } = entity as Entity & { position?: unknown };
+  const wire = rest as Record<string, unknown>;
+  if (Array.isArray(position) && position.length === 2) {
+    wire.lat = position[0];
+    wire.lon = position[1];
+  }
+  return wire;
+}
