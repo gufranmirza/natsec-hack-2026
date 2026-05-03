@@ -31,7 +31,11 @@ import {
 } from 'lucide-react';
 
 import { ColMap } from '@/components/_columns/col-map';
-import type { WorkspaceSectionId } from '@/components/_columns/col-status';
+import {
+  FeedRow,
+  Section,
+  type WorkspaceSectionId,
+} from '@/components/_columns/col-status';
 import { MarkdownAnswer } from '@/components/_ontology/markdown-answer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -96,6 +100,8 @@ interface WorkspaceCenterProps {
   onViewObjectOnMap: (object: AnyObject) => void;
   onMissionSelect: (id: string) => void;
   onAsk: (query: string, fromVoice?: boolean) => void;
+  /** True while a query is in flight — drives the AI surface's thinking affordance. */
+  isAskingAi?: boolean;
   /** Voice props are threaded through so the AI Intelligence surface can host
    * a hero mic without duplicating the global voice handler. */
   onVoiceCommand?: () => void;
@@ -128,6 +134,7 @@ export function WorkspaceCenter({
   onViewObjectOnMap,
   onMissionSelect,
   onAsk,
+  isAskingAi,
   onVoiceCommand,
   voiceListening,
   voiceArmed,
@@ -137,9 +144,8 @@ export function WorkspaceCenter({
     return (
       <SourceDetailSurface
         source={activeFeedSource}
-        reports={reports}
         events={events}
-        onInjectFeed={onInjectFeed}
+        onSelect={onSelect}
       />
     );
   }
@@ -196,6 +202,7 @@ export function WorkspaceCenter({
         events={events}
         recommendations={recommendations}
         aiAnswer={aiAnswer}
+        isAskingAi={isAskingAi}
         onAsk={onAsk}
         onVoiceCommand={onVoiceCommand}
         voiceListening={voiceListening}
@@ -217,21 +224,13 @@ export function WorkspaceCenter({
 
 function SourceDetailSurface({
   source,
-  reports,
   events,
-  onInjectFeed,
+  onSelect,
 }: {
   source: DataSourceId;
-  reports: Report[];
   events: Event[];
-  onInjectFeed: (source: DataSourceId) => void;
+  onSelect: (o: AnyObject) => void;
 }) {
-  const sourceReports = reports.filter((report) =>
-    source === 'satellite'
-      ? report._subtype === 'sigint' || report._source === 'satellite'
-      : report._source === source ||
-        report._source_ref?.toLowerCase() === source
-  );
   const sourceEvents = events.filter((event) =>
     source === 'radio'
       ? event._source.includes('voice') || event._source === 'radio'
@@ -275,126 +274,77 @@ function SourceDetailSurface({
             ))}
           </div>
         </div>
-        <div className="bg-background grid min-h-0 grid-rows-[auto_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] overflow-hidden">
-          <div className="border-border border-b p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <div className="label-cap-sm text-muted-foreground">
-                  Processor
-                </div>
-                <div className="text-foreground font-mono text-[13px] font-bold">
-                  {sourcePipeline(source)}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => onInjectFeed(source)}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 px-3 py-2 font-mono text-[11px] font-bold"
-              >
-                Inject refresh
-              </button>
-            </div>
-            <p className="text-muted-foreground text-[12px] leading-relaxed">
-              {sourceNarrative(source)}
-            </p>
-          </div>
-          <div className="min-h-0 overflow-y-auto p-4">
-            <PanelTitle
-              title="Extracted objects"
-              meta={`${sourceReports.length} reports`}
-            />
-            <div className="mt-2 grid gap-2">
-              {sourceReports.slice(0, 4).map((report) => (
-                <EvidenceCard
-                  key={report._id}
-                  title={report._source_ref ?? report._source}
-                  body={report.text}
-                  meta={report.classification}
-                />
-              ))}
-              {sourceReports.length === 0 ? (
-                <EvidenceCard
-                  title="Synthetic fixture"
-                  body="No injected report yet. Click a source card or Inject refresh to materialize a new feed object, event, and audit trail."
-                  meta="standby"
-                />
-              ) : null}
-            </div>
-          </div>
-          <FusionEventsPanel events={events} sourceEvents={sourceEvents} />
-          <FusionChangesPanel events={events} />
-        </div>
+        <FusionEventsRail
+          events={events}
+          sourceEvents={sourceEvents}
+          onSelect={onSelect}
+        />
       </div>
     </section>
   );
 }
 
-// FusionEventsPanel — every event in the mission graph, newest first.
-// Independent of the active source so the operator can watch the full
-// fusion churn while drilling into one source's feed table on the left.
-function FusionEventsPanel({
+// FusionEventsRail — right rail of the FUSE tab. Same Section + FeedRow
+// design used in AwarenessPanel's "What changed." block on the COP tab,
+// so the events / state-deltas read identically in both places.
+function FusionEventsRail({
   events,
   sourceEvents,
+  onSelect,
 }: {
   events: Event[];
   sourceEvents: Event[];
+  onSelect: (event: Event) => void;
 }) {
   const newest = [...events].sort((a, b) =>
     (b._observed_at ?? '').localeCompare(a._observed_at ?? '')
   );
+  const changes = newest.filter(isStateChangeEvent);
   return (
-    <div className="border-border flex min-h-0 flex-col overflow-hidden border-t">
-      <div className="border-border bg-muted/20 flex shrink-0 items-baseline justify-between border-b px-4 py-2">
-        <span className="label-cap text-foreground/90">Mission events</span>
-        <span className="text-muted-foreground font-mono text-[10px]">
-          {newest.length} total · {sourceEvents.length} on this source
-        </span>
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-        <div className="grid gap-1.5">
-          {newest.map((event) => (
-            <MiniEvent key={event._id} event={event} />
+    <aside className="bg-background flex min-h-0 flex-col overflow-hidden">
+      <Section
+        title="Mission events"
+        meta={`${newest.length} total · ${sourceEvents.length} on this source`}
+        fill
+      >
+        <ol className="px-3 py-1">
+          {newest.map((event, i) => (
+            <FeedRow
+              key={event._id}
+              event={event}
+              fresh={i === 0}
+              onSelect={() => onSelect(event)}
+            />
           ))}
           {newest.length === 0 ? (
-            <div className="text-muted-foreground py-4 text-center font-mono text-[11px]">
+            <li className="text-muted-foreground py-4 text-center font-mono text-[11px]">
               No events yet — fusion stream is quiet.
-            </div>
+            </li>
           ) : null}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// FusionChangesPanel — events that mutated downstream mission state
-// (operator actions, kinetic engagements, classification upgrades,
-// withdrawals). Pure observations (rf_ping / position_report / ais_gap)
-// are excluded — those are feeds, not deltas.
-function FusionChangesPanel({ events }: { events: Event[] }) {
-  const newest = [...events]
-    .sort((a, b) => (b._observed_at ?? '').localeCompare(a._observed_at ?? ''))
-    .filter(isStateChangeEvent);
-  return (
-    <div className="border-border flex min-h-0 flex-col overflow-hidden border-t">
-      <div className="border-border bg-muted/20 flex shrink-0 items-baseline justify-between border-b px-4 py-2">
-        <span className="label-cap text-foreground/90">What&apos;s changed</span>
-        <span className="text-muted-foreground font-mono text-[10px]">
-          {newest.length} state deltas
-        </span>
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-        <div className="grid gap-1.5">
-          {newest.map((event) => (
-            <MiniEvent key={event._id} event={event} />
+        </ol>
+      </Section>
+      <Section
+        title="What changed."
+        meta={`${changes.length} state deltas`}
+        fill
+      >
+        <ol className="px-3 py-1">
+          {changes.map((event, i) => (
+            <FeedRow
+              key={event._id}
+              event={event}
+              fresh={i === 0}
+              onSelect={() => onSelect(event)}
+            />
           ))}
-          {newest.length === 0 ? (
-            <div className="text-muted-foreground py-4 text-center font-mono text-[11px]">
+          {changes.length === 0 ? (
+            <li className="text-muted-foreground py-4 text-center font-mono text-[11px]">
               No state changes in the current window.
-            </div>
+            </li>
           ) : null}
-        </div>
-      </div>
-    </div>
+        </ol>
+      </Section>
+    </aside>
   );
 }
 
@@ -994,6 +944,7 @@ function IntelligenceSurface({
   events,
   recommendations,
   aiAnswer,
+  isAskingAi,
   onAsk,
   onVoiceCommand,
   voiceListening,
@@ -1006,6 +957,7 @@ function IntelligenceSurface({
   events: Event[];
   recommendations: Recommendation[];
   aiAnswer?: MissionAnswer;
+  isAskingAi?: boolean;
   onAsk: (query: string, fromVoice?: boolean) => void;
   onVoiceCommand?: () => void;
   voiceListening?: boolean;
@@ -1023,8 +975,8 @@ function IntelligenceSurface({
     6
   );
   const [text, setText] = useState('');
-  // Hide prompts once we have an answer — operator can re-open them.
-  const [showPrompts, setShowPrompts] = useState(!aiAnswer);
+  // Prompts default to expanded; operator can collapse manually.
+  const [showPrompts, setShowPrompts] = useState(true);
 
   const submit = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -1048,7 +1000,7 @@ function IntelligenceSurface({
         meta={`${corpus} indexed objects · azure gpt-4o`}
       />
       <div className="bg-card min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex max-w-3xl flex-col gap-6 p-6">
+        <div className="flex w-full flex-col gap-6 p-6">
           {/* HERO — voice-first ask block */}
           <div className="border-border bg-background flex flex-col items-center border p-6 text-center">
             <button
@@ -1077,14 +1029,14 @@ function IntelligenceSurface({
                   : 'Hold to speak · or type below'}
             </div>
             {voiceTranscript ? (
-              <div className="text-foreground/90 mt-3 max-w-xl text-[13px] italic leading-snug">
+              <div className="text-foreground/90 mt-3 max-w-2xl text-[13px] italic leading-snug">
                 &ldquo;{voiceTranscript}&rdquo;
               </div>
             ) : null}
 
             <form
               onSubmit={submit}
-              className="mt-5 flex w-full max-w-xl items-stretch gap-2"
+              className="mt-5 flex w-full max-w-3xl items-stretch gap-2"
             >
               <Input
                 type="text"
@@ -1104,8 +1056,41 @@ function IntelligenceSurface({
             </form>
           </div>
 
-          {/* ANSWER — only when present */}
-          {aiAnswer ? (
+          {/* THINKING — render while a query is in flight. Shows the
+              operator's question immediately so the surface is reactive
+              even before the model starts streaming. */}
+          {isAskingAi ? (
+            <div className="border-warning/50 bg-warning/5 border p-4">
+              <div className="mb-2 flex items-baseline justify-between gap-3">
+                <h2 className="text-foreground font-mono text-[13px] font-bold">
+                  Thinking…
+                </h2>
+                <span className="text-warning font-mono text-[9px] uppercase tracking-wider">
+                  Agent · grounded SQL
+                </span>
+              </div>
+              {text.trim() || voiceTranscript ? (
+                <div className="text-muted-foreground mb-3 text-[12px] italic">
+                  &ldquo;{text.trim() || voiceTranscript}&rdquo;
+                </div>
+              ) : null}
+              <div className="text-muted-foreground flex items-center gap-1 font-mono text-[10px]">
+                <span className="bg-warning size-1.5 animate-pulse" />
+                <span
+                  className="bg-warning size-1.5 animate-pulse"
+                  style={{ animationDelay: '120ms' }}
+                />
+                <span
+                  className="bg-warning size-1.5 animate-pulse"
+                  style={{ animationDelay: '240ms' }}
+                />
+                <span className="ml-2">querying mission state…</span>
+              </div>
+            </div>
+          ) : null}
+
+          {/* ANSWER — only when present and not currently re-thinking */}
+          {aiAnswer && !isAskingAi ? (
             <div className="border-primary/50 bg-primary/5 border p-4">
               <div className="mb-2 flex items-baseline justify-between gap-3">
                 <h2 className="text-foreground font-mono text-[13px] font-bold">
@@ -1116,6 +1101,11 @@ function IntelligenceSurface({
                   {aiAnswer.fromVoice ? 'voice' : 'typed'}
                 </span>
               </div>
+              {aiAnswer.query ? (
+                <div className="border-border bg-card text-foreground/80 mb-3 border-l-2 px-3 py-1.5 text-[12px] italic leading-snug">
+                  {aiAnswer.query}
+                </div>
+              ) : null}
               <MarkdownAnswer
                 text={aiAnswer.response}
                 className="text-foreground/90 space-y-2 text-[13px]"
@@ -1274,34 +1264,6 @@ function syntheticRows(source: DataSourceId) {
     signal,
     confidence,
   }));
-}
-
-function sourcePipeline(source: DataSourceId) {
-  return {
-    radio: 'Whisper-class ASR → entity extraction → object link',
-    satellite: 'Change detection → track association → heat/route cue',
-    intel: 'Report parser → entity linker → pattern matcher',
-    social: 'Geotag scrape → credibility score → temporal join',
-    allies: 'Liaison adapter → radar cue normalization',
-    drone_video: 'EO/IR detector → tracklet fusion → target handoff',
-  }[source];
-}
-
-function sourceNarrative(source: DataSourceId) {
-  return {
-    radio:
-      'Simulated radio traffic is transcribed, segmented, and linked to known units, grid references, and unresolved objects before it enters the mission graph.',
-    satellite:
-      'Synthetic satellite change detection compares route scars, heat residue, and track continuity against recent mission context.',
-    intel:
-      'Intel reports are parsed into entities, locations, and events, then fused with live sensor state for commander-ready context.',
-    social:
-      'Public OSINT cues are geolocated and credibility-scored before they can influence recommendations.',
-    allies:
-      'Allied communications are normalized into the same ontology so radar, liaison, and unit reports become queryable.',
-    drone_video:
-      'Drone video is represented as EO/IR tracklets with confidence, object association, and audit trail references.',
-  }[source];
 }
 
 function SurfaceHeader({

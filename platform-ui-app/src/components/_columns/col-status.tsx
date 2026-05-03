@@ -677,7 +677,7 @@ function IntelligencePanel({
   );
 }
 
-function Section({
+export function Section({
   title,
   meta,
   children,
@@ -1196,7 +1196,7 @@ function ReportList({
   );
 }
 
-function FeedRow({
+export function FeedRow({
   event,
   fresh,
   onSelect,
