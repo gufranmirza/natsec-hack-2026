@@ -158,12 +158,28 @@ export interface Report extends OntologyEnvelope {
 // Unit (ADR 0002 §5.4)
 // ──────────────────────────────────────────────────────────────────
 
+// Original 5 plus finer-grained values per UI ADR 0002 §12 — kept
+// in lockstep with the Go const block in
+// platform-control-plane/internal/ontology/objects.go.
 export type UnitSubtype =
+  // legacy / generic
   | 'drone'
   | 'vehicle'
   | 'infantry'
   | 'boat'
-  | 'command_post';
+  | 'command_post'
+  // finer-grained, used by OP SILENT EYE
+  | 'drone_isr'
+  | 'drone_strike'
+  | 'infantry_team'
+  | 'infantry_recon'
+  | 'infantry_kinetic'
+  | 'vehicle_mech'
+  | 'vehicle_recon'
+  | 'vehicle_himars'
+  | 'vehicle_mortar'
+  | 'vehicle_medical'
+  | 'vehicle_logistic';
 
 export type UnitStatus =
   | 'idle'

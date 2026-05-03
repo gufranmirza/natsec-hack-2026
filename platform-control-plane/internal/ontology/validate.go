@@ -62,7 +62,19 @@ var (
 	severities          = []string{SeverityInfo, SeverityWarn, SeverityCritical}
 	reportSubtypes      = []string{ReportSubtypeOperator, ReportSubtypeRadio, ReportSubtypeSigint, ReportSubtypeOSINT, ReportSubtypeUnknown}
 	classifications     = []string{ClassificationUnclass, ClassificationCUI, ClassificationConfidential}
-	unitSubtypes        = []string{UnitSubtypeDrone, UnitSubtypeVehicle, UnitSubtypeInfantry, UnitSubtypeBoat, UnitSubtypeCommandPost}
+	// Keep in lockstep with the const block in objects.go. Original
+	// 5 plus the finer-grained subtypes added per UI ADR 0002.
+	unitSubtypes = []string{
+		// original
+		UnitSubtypeDrone, UnitSubtypeVehicle, UnitSubtypeInfantry,
+		UnitSubtypeBoat, UnitSubtypeCommandPost,
+		// finer-grained
+		UnitSubtypeDroneISR, UnitSubtypeDroneStrike,
+		UnitSubtypeInfantryTeam, UnitSubtypeInfantryRecon, UnitSubtypeInfantryKinetic,
+		UnitSubtypeVehicleMech, UnitSubtypeVehicleRecon,
+		UnitSubtypeVehicleHIMARS, UnitSubtypeVehicleMortar,
+		UnitSubtypeVehicleMedical, UnitSubtypeVehicleLogistic,
+	}
 	unitStatuses        = []string{UnitStatusIdle, UnitStatusEnRoute, UnitStatusOnStation, UnitStatusReturning, UnitStatusOffline}
 	recStatuses         = []string{RecStatusPending, RecStatusAccepted, RecStatusRejected, RecStatusExpired}
 	priorities          = []string{PriorityP0, PriorityP1, PriorityP2}

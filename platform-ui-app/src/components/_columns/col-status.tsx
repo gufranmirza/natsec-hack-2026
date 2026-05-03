@@ -271,7 +271,9 @@ function AwarenessPanel({
         </ul>
       </Section>
       <Section title="OSINT" meta={`${osintReports.length} public cue`}>
-        <ReportList reports={osintReports} onSelect={onSelect} />
+        <div className="max-h-[220px] overflow-y-auto">
+          <ReportList reports={osintReports} onSelect={onSelect} />
+        </div>
       </Section>
       <Section title="What changed." meta={`Last 10m · ${events.length}`} fill>
         <ol className="px-3 py-1">
@@ -783,9 +785,14 @@ function UnitRow({
         />
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-2">
-            <span className="text-foreground font-mono text-[12px] font-bold">
-              {unit.callsign}
-            </span>
+            <div className="flex min-w-0 items-baseline gap-1.5">
+              <span className="text-foreground font-mono text-[12px] font-bold">
+                {unit.callsign}
+              </span>
+              <span className="text-muted-foreground/70 truncate font-mono text-[10px]">
+                {unitTypeLabel(unit)}
+              </span>
+            </div>
             <UnitStatusPill status={unit.status} />
           </div>
           <UnitMetrics
@@ -805,35 +812,62 @@ function UnitRow({
 // either fire on call (LIGHTNING/THUNDER) or sustain from depth (DRAY).
 const OFF_MAP_CALLSIGNS = new Set(['LIGHTNING', 'THUNDER', 'DRAY']);
 
-// unitIcon picks a Lucide glyph from the unit's subtype + capabilities
-// + callsign, so the row says what the platform IS at a glance instead
-// of relying on the operator to remember from the callsign alone.
+// Single source of truth: the finer-grained UnitSubtype values defined
+// in src/types/ontology.ts (mirroring the Go const block) carry both
+// the human-readable label AND the icon. No callsign-specific code in
+// the UI — what the unit IS lives on the unit's _subtype field.
+const UNIT_SUBTYPE_META: Record<
+  Unit['_subtype'],
+  { label: string; icon: LucideIcon }
+> = {
+  // finer-grained (preferred — set by JSONL author per OP SILENT EYE)
+  command_post:     { label: 'command post',     icon: Crosshair },
+  drone_isr:        { label: 'ISR drone',        icon: Plane },
+  drone_strike:     { label: 'strike UAS',       icon: PlaneTakeoff },
+  infantry_team:    { label: 'infantry team',    icon: Users },
+  infantry_recon:   { label: 'forward observer', icon: Eye },
+  infantry_kinetic: { label: 'FPV team',         icon: Zap },
+  vehicle_mech:     { label: 'mech infantry',    icon: Truck },
+  vehicle_recon:    { label: 'recon vehicle',    icon: Eye },
+  vehicle_himars:   { label: 'HIMARS pair',      icon: Rocket },
+  vehicle_mortar:   { label: 'mortar section',   icon: Rocket },
+  vehicle_medical:  { label: 'medical',          icon: Heart },
+  vehicle_logistic: { label: 'logistics',        icon: Truck },
+  // legacy / unspecified — fallback when _subtype is the generic
+  // pre-extension value
+  drone:            { label: 'drone',            icon: Plane },
+  vehicle:          { label: 'vehicle',          icon: Truck },
+  infantry:         { label: 'infantry team',    icon: Users },
+  boat:             { label: 'patrol boat',      icon: Truck },
+};
+
+function unitTypeLabel(unit: Unit): string {
+  return UNIT_SUBTYPE_META[unit._subtype]?.label ?? unit._subtype;
+}
+
 function unitIcon(unit: Unit): LucideIcon {
-  const caps = new Set(unit.capabilities ?? []);
-  const cs = unit.callsign;
+  return UNIT_SUBTYPE_META[unit._subtype]?.icon ?? Truck;
+}
 
-  // Platform overrides by callsign — the JSONL doesn't model platform
-  // class, so we encode the few well-known ones explicitly.
-  if (cs === 'LAZARUS') return Heart;            // medical
-  if (cs === 'LIGHTNING') return Rocket;         // HIMARS pair
-  if (cs === 'FALCON-1') return PlaneTakeoff;    // medium UAS
-  if (cs === 'HORNET') return Zap;               // FPV team
-  if (cs === 'SCOUT-2') return Eye;              // forward observer
-
-  switch (unit._subtype) {
-    case 'command_post':
-      return Crosshair;
-    case 'drone':
-      return Plane;
-    case 'infantry':
-      return caps.has('kinetic') ? Zap : Users;
-    case 'vehicle':
-      return caps.has('kinetic') ? Rocket : Truck;
-    case 'boat':
-      return Truck; // closest available; no nautical icon in lucide-core
-    default:
-      return Truck;
+// entityCategoryLabel reads the OSINT-grounded role straight off the
+// entity's attributes. Prefers a producer-set `attributes.role` (short
+// canonical category), falls back to `attributes.platform_role` (free
+// text, trimmed if long), and finally to the generic ontology
+// `_subtype` (Aircraft / Vehicle / Person / Threat / Unknown).
+//
+// No callsign / id hardcoding — what the entity IS lives on the entity.
+function entityCategoryLabel(entity: Entity): string {
+  const role = entity.attributes?.role;
+  if (role) return role;
+  const platformRole = entity.attributes?.platform_role;
+  if (platformRole) {
+    // Strip the leading nationality prefix ("Russian ", "Ukrainian ")
+    // so the chip stays compact; keep the noun.
+    return platformRole
+      .replace(/^Russian\s+|^Ukrainian\s+|^NATO\s+/i, '')
+      .replace(/^primary\s+/i, '');
   }
+  return entity._subtype;
 }
 
 // UnitStatusPill — small subtle badge replacing the raw "ON_STATION"
@@ -953,6 +987,11 @@ function ContactRow({
   // Falls back to subtype when attributes.class is absent.
   const platform = entity.attributes?.class ?? entity._subtype;
   const offMap = entity.attributes?.off_map === 'true';
+  // Short category sits next to the name so the row tells you what
+  // KIND of contact this is at a glance (e.g., "ISR UAV", "MBT",
+  // "MRL battery", "loitering munition") without needing the full
+  // platform-class string.
+  const category = entityCategoryLabel(entity);
 
   return (
     <li>
@@ -996,9 +1035,14 @@ function ContactRow({
         </svg>
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-2">
-            <span className="text-foreground truncate font-mono text-[12px] font-bold">
-              {entity.name ?? entity._id}
-            </span>
+            <div className="flex min-w-0 items-baseline gap-1.5">
+              <span className="text-foreground truncate font-mono text-[12px] font-bold">
+                {entity.name ?? entity._id}
+              </span>
+              <span className="text-muted-foreground/70 truncate font-mono text-[10px]">
+                {category}
+              </span>
+            </div>
             <span
               className={`shrink-0 rounded-sm border px-1 py-px font-mono text-[9px] uppercase tracking-wide ${threatTone}`}
             >

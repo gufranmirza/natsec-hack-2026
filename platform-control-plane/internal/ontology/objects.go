@@ -185,11 +185,31 @@ type Report struct {
 
 // Unit subtypes.
 const (
+	// Original 5 — keep for back-compat with anything that ingested
+	// before the finer-grained subtypes landed. Treat as "unspecified
+	// kind within this category" on the read side.
 	UnitSubtypeDrone       = "drone"
 	UnitSubtypeVehicle     = "vehicle"
 	UnitSubtypeInfantry    = "infantry"
 	UnitSubtypeBoat        = "boat"
 	UnitSubtypeCommandPost = "command_post"
+
+	// Finer-grained subtypes per UI ADR 0002 — extended so the UI
+	// doesn't have to hardcode callsign-specific labels. Same pattern
+	// as the EventSubtype extension. Each value is its own legible
+	// human-readable category (e.g. _subtype: 'drone_isr' renders as
+	// "ISR drone" via a tiny TS label table on the UI side).
+	UnitSubtypeDroneISR        = "drone_isr"        // small ISR quadcopter (Skydio class)
+	UnitSubtypeDroneStrike     = "drone_strike"     // medium UAS w/ kinetic payload (Bayraktar / Punisher)
+	UnitSubtypeInfantryTeam    = "infantry_team"    // generic dismounted team
+	UnitSubtypeInfantryRecon   = "infantry_recon"   // forward observer / scout dismount
+	UnitSubtypeInfantryKinetic = "infantry_kinetic" // FPV / strike team
+	UnitSubtypeVehicleMech     = "vehicle_mech"     // mechanized infantry IFV (BMP / BTR / Bradley)
+	UnitSubtypeVehicleRecon    = "vehicle_recon"    // recon LTV / wheeled scout
+	UnitSubtypeVehicleHIMARS   = "vehicle_himars"   // long-range fires launcher
+	UnitSubtypeVehicleMortar   = "vehicle_mortar"   // mortar section
+	UnitSubtypeVehicleMedical  = "vehicle_medical"  // ambulance / casevac
+	UnitSubtypeVehicleLogistic = "vehicle_logistic" // sustainment
 )
 
 // Unit status values.
