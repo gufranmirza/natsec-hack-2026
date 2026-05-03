@@ -50,9 +50,18 @@ function withChips(
 interface ColCopilotProps {
   recommendations: Recommendation[];
   onSelect: (o: AnyObject) => void;
+  onApprove: (rec: Recommendation) => void;
+  onReject: (rec: Recommendation) => void;
+  onModify: (rec: Recommendation) => void;
 }
 
-export function ColCopilot({ recommendations, onSelect }: ColCopilotProps) {
+export function ColCopilot({
+  recommendations,
+  onSelect,
+  onApprove,
+  onReject,
+  onModify,
+}: ColCopilotProps) {
   return (
     <aside className="bg-background flex h-full min-h-0 flex-col overflow-hidden">
       {/* TOP 50%: Recommendations */}
@@ -60,6 +69,9 @@ export function ColCopilot({ recommendations, onSelect }: ColCopilotProps) {
         <RecommendationsPanel
           recommendations={recommendations}
           onSelect={onSelect}
+          onApprove={onApprove}
+          onReject={onReject}
+          onModify={onModify}
         />
       </section>
 
@@ -78,16 +90,25 @@ export function ColCopilot({ recommendations, onSelect }: ColCopilotProps) {
 function RecommendationsPanel({
   recommendations,
   onSelect,
+  onApprove,
+  onReject,
+  onModify,
 }: {
   recommendations: Recommendation[];
   onSelect: (o: AnyObject) => void;
+  onApprove: (rec: Recommendation) => void;
+  onReject: (rec: Recommendation) => void;
+  onModify: (rec: Recommendation) => void;
 }) {
+  const pendingCount = recommendations.filter(
+    (rec) => rec.status === 'pending'
+  ).length;
   return (
     <>
       <header className="border-border bg-muted/30 flex shrink-0 items-baseline justify-between border-b px-3 py-1">
         <h2 className="text-foreground/90 label-cap">Recommendations</h2>
         <span className="text-muted-foreground/80 font-mono text-[10px]">
-          {recommendations.length} pending · grounded
+          {pendingCount} pending · grounded
         </span>
       </header>
 
@@ -102,6 +123,9 @@ function RecommendationsPanel({
                 rec={r}
                 active={i === 0}
                 onSelect={onSelect}
+                onApprove={onApprove}
+                onReject={onReject}
+                onModify={onModify}
               />
             ))}
           </div>
@@ -115,10 +139,16 @@ function RecommendationCard({
   rec,
   active,
   onSelect,
+  onApprove,
+  onReject,
+  onModify,
 }: {
   rec: Recommendation;
   active?: boolean;
   onSelect: (o: AnyObject) => void;
+  onApprove: (rec: Recommendation) => void;
+  onReject: (rec: Recommendation) => void;
+  onModify: (rec: Recommendation) => void;
 }) {
   const conf = Math.round(rec.confidence * 8);
   const confTone =
@@ -128,11 +158,15 @@ function RecommendationCard({
         ? 'bg-success'
         : 'bg-muted-foreground/60';
 
+  const decided = rec.status === 'accepted' || rec.status === 'rejected';
+
   return (
     <Card
       className={[
         'hover:border-primary/60 mb-2 px-2.5 py-2.5 transition-colors last:mb-0',
-        active ? 'brackets relative' : '',
+        active && rec.status === 'pending' ? 'brackets relative' : '',
+        rec.status === 'accepted' ? 'border-success/70 bg-success/5' : '',
+        rec.status === 'rejected' ? 'opacity-55' : '',
       ].join(' ')}
     >
       <div className="flex items-baseline justify-between gap-3">
@@ -178,27 +212,42 @@ function RecommendationCard({
         <div className="flex items-center gap-1.5">
           <span
             className={`size-1.5 ${
-              rec.gating === 'auto'
+              rec.status === 'accepted'
                 ? 'bg-success'
-                : rec.gating === 'confirm'
-                  ? 'bg-warning'
-                  : 'bg-threat'
+                : rec.status === 'rejected'
+                  ? 'bg-threat'
+                  : rec.gating === 'auto'
+                    ? 'bg-success'
+                    : rec.gating === 'confirm'
+                      ? 'bg-warning'
+                      : 'bg-threat'
             }`}
           />
           <span className="text-muted-foreground label-cap-sm">
-            {rec.gating}
+            {rec.status === 'pending' ? rec.gating : rec.status}
           </span>
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" aria-label="Reject">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Reject"
+            disabled={decided}
+            onClick={() => onReject(rec)}
+          >
             <X className="size-3" />
           </Button>
-          <Button variant="ghost" size="sm">
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={decided}
+            onClick={() => onModify(rec)}
+          >
             <Pencil className="size-3" />
             Modify
           </Button>
-          <Button size="sm" onClick={() => onSelect(rec)}>
-            Approve
+          <Button size="sm" disabled={decided} onClick={() => onApprove(rec)}>
+            {rec.status === 'accepted' ? 'Approved' : 'Approve'}
             <ChevronRight className="size-3" />
           </Button>
         </div>

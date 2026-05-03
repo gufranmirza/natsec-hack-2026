@@ -20,14 +20,14 @@ export const RECOMMENDATIONS: Recommendation[] = [
     rationale:
       'Track persistent for 46s. Heading converges with BOGEY-7. Consistent with prior incursion signatures (1.3 nm match in archived RF library).',
     confidence: 0.87,
-    evidence_refs: ['evt_005', 'evt_004', 'rep_002'],
+    evidence_refs: ['evt_005', 'evt_004', 'rep_002', 'rep_003'],
     status: 'pending',
     gating: 'confirm',
     verb: 'Vector',
     short: 'ROOK-1 to intercept BOGEY-7.',
     asset_callsign: 'ROOK-1',
     eta: 'Intercept 4m 02s · fuel margin +18%',
-    why: ['Track persists 46s', 'Heading converges', 'Match vs known sigs'],
+    why: ['Track persists 46s', 'OSINT geotag cue', 'Match vs known sigs'],
   },
   {
     _type: 'Recommendation',

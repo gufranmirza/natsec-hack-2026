@@ -11,6 +11,7 @@ import type {
   Entity,
   Event,
   MissionObjective,
+  Report,
   Unit,
 } from '@/types/ontology';
 
@@ -19,6 +20,7 @@ interface ColStatusProps {
   units: Unit[];
   entities: Entity[];
   events: Event[];
+  reports: Report[];
   selectedId?: string;
   onSelect: (o: AnyObject) => void;
 }
@@ -28,11 +30,13 @@ export function ColStatus({
   units,
   entities,
   events,
+  reports,
   selectedId,
   onSelect,
 }: ColStatusProps) {
   const hostiles = entities.filter((e) => e.affiliation === 'hostile');
   const unknowns = entities.filter((e) => e.affiliation === 'unknown');
+  const osintReports = reports.filter((report) => report._subtype === 'osint');
 
   return (
     <aside className="bg-background flex h-full min-h-0 flex-col overflow-hidden">
@@ -66,6 +70,32 @@ export function ColStatus({
               selected={selectedId === e._id}
               onSelect={() => onSelect(e)}
             />
+          ))}
+        </ul>
+      </Section>
+
+      <Section title="OSINT" meta={`${osintReports.length} public cue`}>
+        <ul className="divide-border divide-y">
+          {osintReports.map((report) => (
+            <li key={report._id}>
+              <button
+                type="button"
+                onClick={() => onSelect(report)}
+                className="hover:bg-secondary flex w-full flex-col items-start gap-1 px-3 py-1.5 text-left transition-colors"
+              >
+                <div className="flex w-full items-baseline justify-between gap-2">
+                  <span className="text-foreground font-mono text-[11px] font-bold">
+                    {report._source_ref}
+                  </span>
+                  <span className="text-muted-foreground font-mono text-[10px]">
+                    {report.classification.toUpperCase()}
+                  </span>
+                </div>
+                <span className="text-muted-foreground line-clamp-2 text-[11px] leading-snug">
+                  {report.text}
+                </span>
+              </button>
+            </li>
           ))}
         </ul>
       </Section>
