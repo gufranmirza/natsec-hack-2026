@@ -505,6 +505,30 @@ export const EVENTS: Event[] = [
   },
   {
     _type: "Event",
+    _id: "evt_civ_003",
+    _source: "sim:silent-eye-20260502",
+    _source_ref: "evt_civ_003",
+    _observed_at: "2026-05-02T07:55:30.000Z",
+    _subtype: "position_report",
+    unit_id: "unit_blue_recon_team1",
+    position: [
+      48.69,
+      37.5
+    ],
+    severity: "info",
+    description: "SCOUT-1: civilian truck (CIV-TRK-A) progressed ~3km west on M-03 since first observation. Confirms non-combatant pattern, filed for awareness only. No fusion alert.",
+    verb: "Reported.",
+    payload: {
+      observed_entity: "ent_civ_truck_01",
+      movement_observed: "true",
+      threat_assessment: "none",
+      fusion_alert: "suppressed"
+    },
+    _version: 1,
+    _ingested_at: "2026-05-02T07:55:30.000Z"
+  },
+  {
+    _type: "Event",
     _id: "evt_phase6_004",
     _source: "sim:silent-eye-20260502",
     _source_ref: "evt_phase6_004",
@@ -572,6 +596,29 @@ export const EVENTS: Event[] = [
     },
     _version: 1,
     _ingested_at: "2026-05-02T07:51:00.000Z"
+  },
+  {
+    _type: "Event",
+    _id: "evt_phase6_009",
+    _source: "sim:silent-eye-20260502",
+    _source_ref: "evt_phase6_009",
+    _observed_at: "2026-05-02T07:50:30.000Z",
+    _subtype: "sigint_intercept",
+    entity_id: "ent_red_grad_battery_01",
+    position: [
+      48.62,
+      38.04
+    ],
+    severity: "warn",
+    description: "SIG-A: BM-21 Grad battery RF survey detected at grid 37U-CN-630. Battery silent so far this window, but present and capable of area-fires on PUNISHER axis.",
+    verb: "Detected.",
+    payload: {
+      channel: "R-168",
+      detection_basis: "rf_survey",
+      activity: "silent_observed"
+    },
+    _version: 1,
+    _ingested_at: "2026-05-02T07:50:30.000Z"
   },
   {
     _type: "Event",
@@ -866,6 +913,31 @@ export const EVENTS: Event[] = [
   },
   {
     _type: "Event",
+    _id: "evt_civ_002",
+    _source: "sim:silent-eye-20260502",
+    _source_ref: "evt_civ_002",
+    _observed_at: "2026-05-02T07:18:00.000Z",
+    _subtype: "visual_detection",
+    entity_id: "ent_civ_car_01",
+    unit_id: "unit_rook2",
+    position: [
+      48.52,
+      37.62
+    ],
+    severity: "info",
+    description: "ROOK-2 EO clutter pickup on civilian car traveling north on local road. Auto-classified non-combatant; no fusion alert.",
+    verb: "Detected.",
+    payload: {
+      sensor: "eo",
+      auto_classification: "civilian",
+      threat_assessment: "none",
+      fusion_alert: "suppressed"
+    },
+    _version: 1,
+    _ingested_at: "2026-05-02T07:18:00.000Z"
+  },
+  {
+    _type: "Event",
     _id: "evt_phase3_003",
     _source: "sim:silent-eye-20260502",
     _source_ref: "evt_phase3_003",
@@ -982,6 +1054,31 @@ export const EVENTS: Event[] = [
         "evt_phase2_002",
         "evt_phase2_001"
       ]
+    },
+    _version: 1,
+    _ingested_at: "2026-05-02T07:00:00.000Z"
+  },
+  {
+    _type: "Event",
+    _id: "evt_civ_001",
+    _source: "sim:silent-eye-20260502",
+    _source_ref: "evt_civ_001",
+    _observed_at: "2026-05-02T07:00:00.000Z",
+    _subtype: "track_acquired",
+    entity_id: "ent_civ_air_01",
+    unit_id: "unit_blue_uas_falcon1",
+    position: [
+      48.6,
+      37.5
+    ],
+    severity: "info",
+    description: "FALCON-1 IR cross-references civilian airliner ADS-B squawk 6712 against expected commercial transit at FL370. No threat, logged for situational awareness.",
+    verb: "Tracked.",
+    payload: {
+      sensor: "ir+ads_b_correlation",
+      squawk: "6712",
+      commercial_transit: "true",
+      threat_assessment: "none"
     },
     _version: 1,
     _ingested_at: "2026-05-02T07:00:00.000Z"

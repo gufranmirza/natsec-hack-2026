@@ -29,9 +29,26 @@ for (const r of rows) {
   r._ingested_at = r._ingested_at ?? r._observed_at;
 }
 
+// For Entity / Unit / MissionObjective we may re-emit the same _id
+// over time (drone moves, entity reclassifies). The static TS fixture
+// represents a snapshot, so dedupe keeping the LATEST _observed_at.
+// Events / Reports / Recommendations are append-only — keep all rows.
+const DEDUPE_TYPES = new Set(['Entity', 'Unit', 'MissionObjective', 'Plan', 'Mission', 'TaskingOrder']);
+
 const byType = {};
 for (const r of rows) {
-  (byType[r._type] ??= []).push(r);
+  const bucket = (byType[r._type] ??= []);
+  if (DEDUPE_TYPES.has(r._type)) {
+    const existing = bucket.findIndex(x => x._id === r._id);
+    if (existing >= 0) {
+      // Keep whichever has the later _observed_at.
+      if ((r._observed_at ?? '') > (bucket[existing]._observed_at ?? '')) {
+        bucket[existing] = r;
+      }
+      continue;
+    }
+  }
+  bucket.push(r);
 }
 
 // Sort each group by _observed_at descending (newest first) — matches

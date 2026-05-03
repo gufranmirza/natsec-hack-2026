@@ -5,6 +5,107 @@ import type { Unit } from '@/types/ontology';
 export const UNITS: Unit[] = [
   {
     _type: "Unit",
+    _id: "unit_blue_medical",
+    _source: "sim:silent-eye-20260502",
+    _source_ref: "unit_blue_medical_t+15",
+    _observed_at: "2026-05-02T08:20:30.000Z",
+    _subtype: "vehicle",
+    callsign: "LAZARUS",
+    position: [
+      48.63,
+      37.72
+    ],
+    speed_mps: 0,
+    status: "on_station",
+    health: "healthy",
+    fuel_pct: 80,
+    capabilities: [],
+    _version: 1,
+    _ingested_at: "2026-05-02T08:20:30.000Z"
+  },
+  {
+    _type: "Unit",
+    _id: "unit_rook2",
+    _source: "sim:silent-eye-20260502",
+    _source_ref: "unit_rook2_t-23",
+    _observed_at: "2026-05-02T07:42:30.000Z",
+    _subtype: "drone",
+    callsign: "ROOK-2",
+    position: [
+      48.55,
+      37.83
+    ],
+    altitude_m: 600,
+    heading_deg: 215,
+    speed_mps: 12,
+    status: "on_station",
+    health: "limited",
+    battery_pct: 42,
+    capabilities: [
+      "optical",
+      "eo"
+    ],
+    assigned_mission_id: "obj_silent_eye",
+    _version: 1,
+    _ingested_at: "2026-05-02T07:42:30.000Z"
+  },
+  {
+    _type: "Unit",
+    _id: "unit_blue_uas_falcon1",
+    _source: "sim:silent-eye-20260502",
+    _source_ref: "unit_blue_uas_falcon1_t-25",
+    _observed_at: "2026-05-02T07:40:00.000Z",
+    _subtype: "drone",
+    callsign: "FALCON-1",
+    position: [
+      48.74,
+      37.85
+    ],
+    altitude_m: 3300,
+    heading_deg: 215,
+    speed_mps: 45,
+    status: "on_station",
+    health: "healthy",
+    battery_pct: 85,
+    fuel_pct: 62,
+    capabilities: [
+      "optical",
+      "ir",
+      "kinetic"
+    ],
+    assigned_mission_id: "obj_silent_eye",
+    _version: 1,
+    _ingested_at: "2026-05-02T07:40:00.000Z"
+  },
+  {
+    _type: "Unit",
+    _id: "unit_rook1",
+    _source: "sim:silent-eye-20260502",
+    _source_ref: "unit_rook1_t-30",
+    _observed_at: "2026-05-02T07:35:30.000Z",
+    _subtype: "drone",
+    callsign: "ROOK-1",
+    position: [
+      48.78,
+      37.96
+    ],
+    altitude_m: 1100,
+    heading_deg: 85,
+    speed_mps: 18,
+    status: "on_station",
+    health: "healthy",
+    battery_pct: 63,
+    capabilities: [
+      "optical",
+      "ir",
+      "sigint"
+    ],
+    assigned_mission_id: "obj_silent_eye",
+    _version: 1,
+    _ingested_at: "2026-05-02T07:35:30.000Z"
+  },
+  {
+    _type: "Unit",
     _id: "unit_blue_cp",
     _source: "sim:silent-eye-20260502",
     _source_ref: "unit_blue_cp",
@@ -97,87 +198,6 @@ export const UNITS: Unit[] = [
   },
   {
     _type: "Unit",
-    _id: "unit_rook1",
-    _source: "sim:silent-eye-20260502",
-    _source_ref: "unit_rook1",
-    _observed_at: "2026-05-02T06:25:00.000Z",
-    _subtype: "drone",
-    callsign: "ROOK-1",
-    position: [
-      48.65,
-      37.78
-    ],
-    altitude_m: 680,
-    heading_deg: 120,
-    speed_mps: 18,
-    status: "on_station",
-    health: "healthy",
-    battery_pct: 76,
-    capabilities: [
-      "optical",
-      "ir",
-      "sigint"
-    ],
-    assigned_mission_id: "obj_silent_eye",
-    _version: 1,
-    _ingested_at: "2026-05-02T06:25:00.000Z"
-  },
-  {
-    _type: "Unit",
-    _id: "unit_rook2",
-    _source: "sim:silent-eye-20260502",
-    _source_ref: "unit_rook2",
-    _observed_at: "2026-05-02T06:25:00.000Z",
-    _subtype: "drone",
-    callsign: "ROOK-2",
-    position: [
-      48.55,
-      37.82
-    ],
-    altitude_m: 620,
-    heading_deg: 215,
-    speed_mps: 16,
-    status: "on_station",
-    health: "healthy",
-    battery_pct: 54,
-    capabilities: [
-      "optical",
-      "eo"
-    ],
-    assigned_mission_id: "obj_silent_eye",
-    _version: 1,
-    _ingested_at: "2026-05-02T06:25:00.000Z"
-  },
-  {
-    _type: "Unit",
-    _id: "unit_blue_uas_falcon1",
-    _source: "sim:silent-eye-20260502",
-    _source_ref: "unit_blue_uas_falcon1",
-    _observed_at: "2026-05-02T06:25:00.000Z",
-    _subtype: "drone",
-    callsign: "FALCON-1",
-    position: [
-      48.7,
-      37.7
-    ],
-    altitude_m: 3200,
-    heading_deg: 135,
-    speed_mps: 42,
-    status: "on_station",
-    health: "healthy",
-    battery_pct: 91,
-    fuel_pct: 68,
-    capabilities: [
-      "optical",
-      "ir",
-      "kinetic"
-    ],
-    assigned_mission_id: "obj_silent_eye",
-    _version: 1,
-    _ingested_at: "2026-05-02T06:25:00.000Z"
-  },
-  {
-    _type: "Unit",
     _id: "unit_blue_fpv_team",
     _source: "sim:silent-eye-20260502",
     _source_ref: "unit_blue_fpv_team",
@@ -215,25 +235,6 @@ export const UNITS: Unit[] = [
     capabilities: [
       "kinetic"
     ],
-    _version: 1,
-    _ingested_at: "2026-05-02T06:25:00.000Z"
-  },
-  {
-    _type: "Unit",
-    _id: "unit_blue_medical",
-    _source: "sim:silent-eye-20260502",
-    _source_ref: "unit_blue_medical",
-    _observed_at: "2026-05-02T06:25:00.000Z",
-    _subtype: "vehicle",
-    callsign: "LAZARUS",
-    position: [
-      48.63,
-      37.72
-    ],
-    status: "on_station",
-    health: "healthy",
-    fuel_pct: 85,
-    capabilities: [],
     _version: 1,
     _ingested_at: "2026-05-02T06:25:00.000Z"
   },

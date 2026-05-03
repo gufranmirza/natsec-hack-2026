@@ -5,6 +5,32 @@ import type { Entity } from '@/types/ontology';
 export const ENTITIES: Entity[] = [
   {
     _type: "Entity",
+    _id: "ent_red_assault_co_01",
+    _source: "sim:silent-eye-20260502",
+    _source_ref: "ent_red_assault_co_01_withdraw",
+    _observed_at: "2026-05-02T08:18:30.000Z",
+    _subtype: "Vehicle",
+    affiliation: "hostile",
+    name: "RED-ASSAULT-1",
+    position: [
+      48.74,
+      37.93
+    ],
+    heading_deg: 45,
+    speed_mps: 18,
+    confidence: 0.71,
+    threat_level: "med",
+    attributes: {
+      class: "motorized rifle company",
+      platform: "5-6x BTR-82A surviving",
+      platform_role: "Russian motorized rifle assault element withdrawing NE",
+      note: "surviving elements after BLUE counter-fire"
+    },
+    _version: 1,
+    _ingested_at: "2026-05-02T08:18:30.000Z"
+  },
+  {
+    _type: "Entity",
     _id: "ent_red_dismount_03",
     _source: "sim:silent-eye-20260502",
     _source_ref: "ent_red_dismount_03",
@@ -136,6 +162,34 @@ export const ENTITIES: Entity[] = [
   },
   {
     _type: "Entity",
+    _id: "ent_red_grad_battery_01",
+    _source: "sim:silent-eye-20260502",
+    _source_ref: "ent_red_grad_battery_01",
+    _observed_at: "2026-05-02T07:50:00.000Z",
+    _subtype: "Vehicle",
+    affiliation: "hostile",
+    name: "RED-GRAD-3",
+    position: [
+      48.62,
+      38.04
+    ],
+    confidence: 0.51,
+    threat_level: "med",
+    attributes: {
+      class: "BM-21 Grad battery",
+      platform: "6x BM-21 Grad MRL",
+      platform_role: "Russian battalion-level area-fires MRL",
+      caliber_mm: "122",
+      tubes: "40 per launcher",
+      off_map: "true",
+      activity: "observed_but_not_firing",
+      note: "second RED indirect-fires asset in AO; did not engage in this window"
+    },
+    _version: 1,
+    _ingested_at: "2026-05-02T07:50:00.000Z"
+  },
+  {
+    _type: "Entity",
     _id: "ent_red_armor_01",
     _source: "sim:silent-eye-20260502",
     _source_ref: "ent_red_armor_01",
@@ -223,33 +277,28 @@ export const ENTITIES: Entity[] = [
   },
   {
     _type: "Entity",
-    _id: "ent_red_assault_co_01",
+    _id: "ent_civ_truck_01",
     _source: "sim:silent-eye-20260502",
-    _source_ref: "ent_red_assault_co_01",
-    _observed_at: "2026-05-02T07:35:00.000Z",
+    _source_ref: "ent_civ_truck_01_moving",
+    _observed_at: "2026-05-02T07:25:00.000Z",
     _subtype: "Vehicle",
-    affiliation: "unknown",
-    name: "RED-ASSAULT-1",
+    affiliation: "neutral",
+    name: "CIV-TRK-A",
     position: [
-      48.74,
-      37.92
+      48.69,
+      37.5
     ],
-    heading_deg: 250,
-    speed_mps: 12,
-    confidence: 0.65,
-    threat_level: "med",
+    heading_deg: 280,
+    speed_mps: 17,
+    confidence: 0.81,
+    threat_level: "none",
     attributes: {
-      class: "motorized rifle company",
-      platform: "12x BTR-82A",
-      platform_role: "Russian motorized rifle assault element",
-      signature_visual: "wheeled-apc-column-formation",
-      signature_ir: "medium-hot-multiple",
-      nominal_speed_mps: "22",
-      weapon: "30mm 2A72 cannon, dismounts with 7.62mm + RPG-7",
-      parent_formation: "likely_132nd_motor_rifle_brigade"
+      class: "civilian utility truck",
+      platform_role: "non-combatant",
+      route: "M-03 highway westbound, ~3 km from initial observation"
     },
     _version: 1,
-    _ingested_at: "2026-05-02T07:35:00.000Z"
+    _ingested_at: "2026-05-02T07:25:00.000Z"
   },
   {
     _type: "Entity",
@@ -306,31 +355,6 @@ export const ENTITIES: Entity[] = [
     },
     _version: 1,
     _ingested_at: "2026-05-02T06:45:00.000Z"
-  },
-  {
-    _type: "Entity",
-    _id: "ent_civ_truck_01",
-    _source: "sim:silent-eye-20260502",
-    _source_ref: "ent_civ_truck_01",
-    _observed_at: "2026-05-02T06:25:00.000Z",
-    _subtype: "Vehicle",
-    affiliation: "neutral",
-    name: "CIV-TRK-A",
-    position: [
-      48.71,
-      37.55
-    ],
-    heading_deg: 280,
-    speed_mps: 15,
-    confidence: 0.78,
-    threat_level: "none",
-    attributes: {
-      class: "civilian utility truck",
-      platform_role: "non-combatant",
-      route: "M-03 highway westbound"
-    },
-    _version: 1,
-    _ingested_at: "2026-05-02T06:25:00.000Z"
   },
   {
     _type: "Entity",
