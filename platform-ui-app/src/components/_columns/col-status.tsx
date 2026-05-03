@@ -1,17 +1,31 @@
 'use client';
 
 import {
+  Battery,
   Brain,
   CheckCircle2,
+  ChevronDown,
+  Crosshair,
   Database,
+  Eye,
   FileStack,
+  Fuel,
+  Heart,
   Network,
   Plane,
+  PlaneTakeoff,
   Radio,
+  Rocket,
   Satellite,
   ShieldCheck,
+  Truck,
+  User,
+  Users,
   Waypoints,
+  Zap,
+  type LucideIcon,
 } from 'lucide-react';
+import { useState } from 'react';
 
 import { affiliationToken } from '@/components/_ontology/affiliation';
 import type {
@@ -19,6 +33,7 @@ import type {
   Entity,
   Event,
   MissionObjective,
+  Recommendation,
   Report,
   Unit,
 } from '@/types/ontology';
@@ -38,6 +53,7 @@ interface ColStatusProps {
   entities: Entity[];
   events: Event[];
   reports: Report[];
+  recommendations: Recommendation[];
   selectedId?: string;
   onSelect: (o: AnyObject) => void;
   onLaunchDrone: (unitId: string) => void;
@@ -98,6 +114,7 @@ export function ColStatus({
   entities,
   events,
   reports,
+  recommendations,
   selectedId,
   onSelect,
   onLaunchDrone,
@@ -154,6 +171,8 @@ export function ColStatus({
           entities={entities}
           reports={reports}
           events={events}
+          recommendations={recommendations}
+          units={units}
           onInjectFeed={onInjectFeed}
         />
       ) : null}
@@ -225,7 +244,7 @@ function AwarenessPanel({
     <>
       <ObjectiveBanner objective={objective} onSelect={onSelect} />
       <Section title="Assets" meta={`${units.length} on roster`}>
-        <ul className="divide-border divide-y">
+        <ul className="divide-border max-h-[260px] divide-y overflow-y-auto">
           {units.map((u) => (
             <UnitRow
               key={u._id}
@@ -240,7 +259,7 @@ function AwarenessPanel({
         title="Contacts"
         meta={`${hostiles.length} hostile · ${unknowns.length} unknown`}
       >
-        <ul className="divide-border divide-y">
+        <ul className="divide-border max-h-[280px] divide-y overflow-y-auto">
           {[...hostiles, ...unknowns].map((e) => (
             <ContactRow
               key={e._id}
@@ -510,13 +529,77 @@ function IntelligencePanel({
   entities,
   reports,
   events,
+  recommendations,
+  units,
   onInjectFeed,
 }: {
   entities: Entity[];
   reports: Report[];
   events: Event[];
+  recommendations: Recommendation[];
+  units: Unit[];
   onInjectFeed: (source: string) => void;
 }) {
+  // Derive live signals from already-loaded props. No SQL, no LLM —
+  // the AI workspace's "current assessment" should reflect the
+  // ontology state, refreshed every time props update.
+  const topThreat = entities
+    .filter((e) => e.threat_level === 'high' || e.threat_level === 'med')
+    .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))[0];
+  const lowestConfidence = entities
+    .filter((e) => e.confidence < 0.7)
+    .sort((a, b) => (a.confidence ?? 0) - (b.confidence ?? 0))[0];
+  const topPendingRec = recommendations.find((r) => r.status === 'pending');
+
+  const mostLikely = topThreat
+    ? `${topThreat.name ?? topThreat._subtype} · ${Math.round((topThreat.confidence ?? 0) * 100)}% confidence`
+    : entities.length > 0
+      ? `${entities.length} tracks, none high-threat`
+      : 'No tracks observed';
+
+  const uncertainty = lowestConfidence
+    ? `${lowestConfidence.name ?? lowestConfidence._subtype} (${Math.round((lowestConfidence.confidence ?? 0) * 100)}%)`
+    : 'All tracks well-resolved';
+
+  const needNext = topPendingRec
+    ? topPendingRec.short ?? topPendingRec.proposed_action_type
+    : (() => {
+        const lastCritical = events.find(
+          (e) => e.severity === 'critical' || e.severity === 'warn'
+        );
+        if (lastCritical?.entity_id) {
+          const tgt = entities.find((e) => e._id === lastCritical.entity_id);
+          return `Resolve ${tgt?.name ?? lastCritical.entity_id}`;
+        }
+        return 'No urgent items';
+      })();
+
+  // Build real correlations: count how many events touch each entity, and
+  // how many entities each report references. Top 4 become the graph chips.
+  const eventCounts = new Map<string, number>();
+  for (const ev of events) {
+    if (ev.entity_id) {
+      eventCounts.set(ev.entity_id, (eventCounts.get(ev.entity_id) ?? 0) + 1);
+    }
+  }
+  const topCorrelated = Array.from(eventCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([entityId, count]) => {
+      const ent = entities.find((e) => e._id === entityId);
+      return {
+        entityName: ent?.name ?? ent?._subtype ?? entityId,
+        count,
+        threat: ent?.threat_level ?? 'unknown',
+      };
+    });
+  const recentReport = reports.find((r) => r.entity_refs && r.entity_refs.length > 0);
+  const supportingReportEntity = (() => {
+    const refs = recentReport?.entity_refs;
+    if (!refs || refs.length === 0) return undefined;
+    return entities.find((e) => e._id === refs[0]);
+  })();
+
   return (
     <>
       <Section title="Analysis surface" meta="queryable">
@@ -533,14 +616,14 @@ function IntelligencePanel({
           />
         </div>
       </Section>
-      <Section title="Current assessment" meta="machine assisted">
+      <Section
+        title="Current assessment"
+        meta={`${units.filter((u) => u._subtype === 'drone').length} drones · ${entities.length} tracks`}
+      >
         <div className="grid gap-2 p-3">
-          <Insight title="Most likely" value="Low UAV + ground support cue" />
-          <Insight
-            title="Uncertainty"
-            value="V-117 intent and route relation"
-          />
-          <Insight title="Need next" value="ROOK-1 visual confirmation" />
+          <Insight title="Most likely" value={mostLikely} />
+          <Insight title="Uncertainty" value={uncertainty} />
+          <Insight title="Need next" value={needNext} />
         </div>
       </Section>
       <Section
@@ -549,14 +632,29 @@ function IntelligencePanel({
         fill
       >
         <div className="grid gap-2 p-3">
-          <GraphLink left="BOGEY-7" edge="correlates" right="SIG-A" />
-          <GraphLink left="SOCIAL-17" edge="supports" right="ROOK-1 track" />
-          <GraphLink left="DeepState" edge="context" right="contact boundary" />
-          <GraphLink
-            left="Commander query"
-            edge="answers from"
-            right="all feeds"
-          />
+          {topCorrelated.length > 0 ? (
+            topCorrelated.map((c) => (
+              <GraphLink
+                key={c.entityName}
+                left={c.entityName}
+                edge={c.threat === 'high' ? 'high threat' : 'observed in'}
+                right={`${c.count} event${c.count > 1 ? 's' : ''}`}
+              />
+            ))
+          ) : (
+            <GraphLink
+              left="No entity ↔ event"
+              edge="links yet"
+              right="ingest a feed"
+            />
+          )}
+          {supportingReportEntity ? (
+            <GraphLink
+              left={recentReport?._subtype ?? 'report'}
+              edge="references"
+              right={supportingReportEntity.name ?? supportingReportEntity._id}
+            />
+          ) : null}
         </div>
       </Section>
     </>
@@ -568,30 +666,51 @@ function Section({
   meta,
   children,
   fill = false,
+  defaultOpen = true,
 }: {
   title: string;
   meta?: string;
   children: React.ReactNode;
   fill?: boolean;
+  defaultOpen?: boolean;
 }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const panelId = `section-${title.replace(/\s+/g, '-').toLowerCase()}`;
   return (
     <section
       className={[
         'border-border border-b',
-        fill ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : 'shrink-0',
+        fill && open ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : 'shrink-0',
       ].join(' ')}
     >
-      <div className="border-border bg-muted/30 flex shrink-0 items-baseline justify-between border-b px-3 py-1">
-        <h2 className="text-foreground/90 label-cap">{title}</h2>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((v) => !v)}
+        className="border-border bg-muted/30 hover:bg-muted/60 flex w-full shrink-0 items-baseline justify-between border-b px-3 py-1 text-left transition-colors"
+      >
+        <span className="flex items-baseline gap-1.5">
+          <ChevronDown
+            className={[
+              'text-muted-foreground/70 size-3 self-center transition-transform',
+              open ? '' : '-rotate-90',
+            ].join(' ')}
+            aria-hidden
+          />
+          <h2 className="text-foreground/90 label-cap">{title}</h2>
+        </span>
         {meta ? (
           <span className="text-muted-foreground/80 font-mono text-[10px]">
             {meta}
           </span>
         ) : null}
-      </div>
-      <div className={fill ? 'min-h-0 flex-1 overflow-y-auto' : ''}>
-        {children}
-      </div>
+      </button>
+      {open ? (
+        <div id={panelId} className={fill ? 'min-h-0 flex-1 overflow-y-auto' : ''}>
+          {children}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -641,36 +760,172 @@ function UnitRow({
       : unit.health === 'limited'
         ? 'bg-warning'
         : 'bg-threat';
+  const Icon = unitIcon(unit);
+  const moving = (unit.speed_mps ?? 0) >= 0.5;
+  const airborne = unit.altitude_m !== undefined && unit.altitude_m > 50;
+  const offMap = OFF_MAP_CALLSIGNS.has(unit.callsign);
+
   return (
     <li>
       <button
         type="button"
         onClick={onSelect}
         className={[
-          'group hover:bg-secondary flex w-full items-center gap-2.5 px-3 py-1.5 text-left transition-colors',
+          'group hover:bg-secondary flex w-full items-center gap-2 px-3 py-1.5 text-left transition-colors',
           selected ? 'bg-secondary' : '',
         ].join(' ')}
       >
-        <span aria-hidden className={`size-1.5 ${dot}`} />
+        <span aria-hidden className={`size-1.5 shrink-0 ${dot}`} />
+        <Icon
+          aria-hidden
+          className="text-muted-foreground/80 size-3.5 shrink-0"
+          strokeWidth={1.8}
+        />
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-2">
             <span className="text-foreground font-mono text-[12px] font-bold">
               {unit.callsign}
             </span>
-            <span className="text-muted-foreground font-mono text-[10px]">
-              {unit.status.toUpperCase()}
-            </span>
+            <UnitStatusPill status={unit.status} />
           </div>
-          <div className="text-muted-foreground/80 font-mono text-[10px]">
-            {unit.battery_pct !== undefined
-              ? `BAT ${unit.battery_pct}% · `
-              : ''}
-            {unit.fuel_pct !== undefined ? `FUEL ${unit.fuel_pct}% · ` : ''}
-            {unit.heading_deg ?? 0}° · {unit.speed_mps ?? 0}m/s
-          </div>
+          <UnitMetrics
+            unit={unit}
+            moving={moving}
+            airborne={airborne}
+            offMap={offMap}
+          />
         </div>
       </button>
     </li>
+  );
+}
+
+// OFF_MAP_CALLSIGNS — assets that operate from rear positions outside
+// the AO bbox. Heading/speed for these is meaningless on the map; they
+// either fire on call (LIGHTNING/THUNDER) or sustain from depth (DRAY).
+const OFF_MAP_CALLSIGNS = new Set(['LIGHTNING', 'THUNDER', 'DRAY']);
+
+// unitIcon picks a Lucide glyph from the unit's subtype + capabilities
+// + callsign, so the row says what the platform IS at a glance instead
+// of relying on the operator to remember from the callsign alone.
+function unitIcon(unit: Unit): LucideIcon {
+  const caps = new Set(unit.capabilities ?? []);
+  const cs = unit.callsign;
+
+  // Platform overrides by callsign — the JSONL doesn't model platform
+  // class, so we encode the few well-known ones explicitly.
+  if (cs === 'LAZARUS') return Heart;            // medical
+  if (cs === 'LIGHTNING') return Rocket;         // HIMARS pair
+  if (cs === 'FALCON-1') return PlaneTakeoff;    // medium UAS
+  if (cs === 'HORNET') return Zap;               // FPV team
+  if (cs === 'SCOUT-2') return Eye;              // forward observer
+
+  switch (unit._subtype) {
+    case 'command_post':
+      return Crosshair;
+    case 'drone':
+      return Plane;
+    case 'infantry':
+      return caps.has('kinetic') ? Zap : Users;
+    case 'vehicle':
+      return caps.has('kinetic') ? Rocket : Truck;
+    case 'boat':
+      return Truck; // closest available; no nautical icon in lucide-core
+    default:
+      return Truck;
+  }
+}
+
+// UnitStatusPill — small subtle badge replacing the raw "ON_STATION"
+// uppercase text. Uses outline tone matching the status semantics.
+function UnitStatusPill({ status }: { status: Unit['status'] }) {
+  const tone =
+    status === 'on_station'
+      ? 'border-success/40 text-success/90'
+      : status === 'en_route'
+        ? 'border-warning/40 text-warning/90'
+        : status === 'returning'
+          ? 'border-primary/40 text-primary/90'
+          : status === 'offline'
+            ? 'border-threat/40 text-threat/90'
+            : 'border-muted-foreground/30 text-muted-foreground';
+  return (
+    <span
+      className={`rounded-sm border px-1 py-px font-mono text-[9px] uppercase tracking-wide ${tone}`}
+    >
+      {status.replace(/_/g, ' ')}
+    </span>
+  );
+}
+
+// UnitMetrics renders only the fields that mean something for THIS
+// unit. Suppresses 0° heading + 0m/s speed on stationary assets,
+// drops kinematic data entirely on off-map assets, shows altitude for
+// drones, etc.
+function UnitMetrics({
+  unit,
+  moving,
+  airborne,
+  offMap,
+}: {
+  unit: Unit;
+  moving: boolean;
+  airborne: boolean;
+  offMap: boolean;
+}) {
+  const chips: React.ReactNode[] = [];
+
+  if (offMap) {
+    chips.push(
+      <span key="off-map" className="text-muted-foreground/60">
+        in support · off-map
+      </span>,
+    );
+  }
+
+  if (unit.battery_pct !== undefined) {
+    chips.push(
+      <span key="bat" className="inline-flex items-center gap-0.5">
+        <Battery aria-hidden className="size-2.5" strokeWidth={2} />
+        {unit.battery_pct}%
+      </span>,
+    );
+  }
+  if (unit.fuel_pct !== undefined) {
+    chips.push(
+      <span key="fuel" className="inline-flex items-center gap-0.5">
+        <Fuel aria-hidden className="size-2.5" strokeWidth={2} />
+        {unit.fuel_pct}%
+      </span>,
+    );
+  }
+
+  if (airborne && unit.altitude_m !== undefined) {
+    chips.push(<span key="alt">{Math.round(unit.altitude_m)}m</span>);
+  }
+
+  if (moving && !offMap) {
+    chips.push(
+      <span key="kin">
+        {unit.heading_deg ?? 0}° · {unit.speed_mps?.toFixed(0)}m/s
+      </span>,
+    );
+  }
+
+  // If nothing meaningful, show a single gentle placeholder so the row
+  // doesn't collapse to just the callsign + status.
+  if (chips.length === 0) {
+    chips.push(
+      <span key="idle" className="text-muted-foreground/60">
+        idle · no telemetry
+      </span>,
+    );
+  }
+
+  return (
+    <div className="text-muted-foreground/80 mt-px flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-[10px]">
+      {chips}
+    </div>
   );
 }
 
@@ -684,23 +939,32 @@ function ContactRow({
   onSelect: () => void;
 }) {
   const tone = affiliationToken(entity.affiliation);
-  const threatColor =
+  const threatTone =
     entity.threat_level === 'high'
-      ? 'text-threat'
+      ? 'border-threat/50 text-threat'
       : entity.threat_level === 'med'
-        ? 'text-warning'
-        : 'text-muted-foreground';
+        ? 'border-warning/50 text-warning'
+        : entity.threat_level === 'low'
+          ? 'border-muted-foreground/40 text-muted-foreground'
+          : 'border-muted-foreground/20 text-muted-foreground/60';
+
+  // Prefer the real platform identity from OSINT-grounded attributes
+  // (e.g., "T-72B3") over the generic ontology subtype ("Vehicle").
+  // Falls back to subtype when attributes.class is absent.
+  const platform = entity.attributes?.class ?? entity._subtype;
+  const offMap = entity.attributes?.off_map === 'true';
+
   return (
     <li>
       <button
         type="button"
         onClick={onSelect}
         className={[
-          'group hover:bg-secondary flex w-full items-center gap-2.5 px-3 py-1.5 text-left transition-colors',
+          'group hover:bg-secondary flex w-full items-center gap-2 px-3 py-1.5 text-left transition-colors',
           selected ? 'bg-secondary' : '',
         ].join(' ')}
       >
-        <svg width="14" height="14" className="shrink-0">
+        <svg width="14" height="14" className="shrink-0" aria-hidden>
           {entity.affiliation === 'hostile' && (
             <polygon
               points="7,1 13,7 7,13 1,7"
@@ -717,19 +981,42 @@ function ContactRow({
               strokeWidth={1.4}
             />
           )}
+          {entity.affiliation === 'neutral' && (
+            <rect
+              x="2"
+              y="2"
+              width="10"
+              height="10"
+              rx="1"
+              fill="none"
+              stroke={tone.hsl}
+              strokeWidth={1.4}
+            />
+          )}
         </svg>
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-2">
-            <span className="text-foreground font-mono text-[12px] font-bold">
+            <span className="text-foreground truncate font-mono text-[12px] font-bold">
               {entity.name ?? entity._id}
             </span>
-            <span className={`font-mono text-[10px] ${threatColor}`}>
-              {entity.threat_level.toUpperCase()}
+            <span
+              className={`shrink-0 rounded-sm border px-1 py-px font-mono text-[9px] uppercase tracking-wide ${threatTone}`}
+            >
+              {entity.threat_level}
             </span>
           </div>
-          <div className="text-muted-foreground/80 font-mono text-[10px]">
-            {entity._subtype} · CONF&nbsp;{(entity.confidence * 100).toFixed(0)}
-            %
+          <div className="text-muted-foreground/80 mt-px flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-[10px]">
+            <span className="truncate" title={platform}>
+              {platform}
+            </span>
+            <span>·</span>
+            <span>conf {(entity.confidence * 100).toFixed(0)}%</span>
+            {offMap ? (
+              <>
+                <span>·</span>
+                <span className="text-muted-foreground/60">off-map</span>
+              </>
+            ) : null}
           </div>
         </div>
       </button>
