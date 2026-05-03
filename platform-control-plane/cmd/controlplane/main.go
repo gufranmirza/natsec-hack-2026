@@ -20,6 +20,7 @@ import (
 	"github.com/nsh-2026/platform-control-plane/internal/config"
 	"github.com/nsh-2026/platform-control-plane/internal/health"
 	"github.com/nsh-2026/platform-control-plane/internal/ontology"
+	"github.com/nsh-2026/platform-control-plane/internal/recengine"
 	"github.com/nsh-2026/platform-control-plane/internal/server"
 )
 
@@ -91,6 +92,13 @@ func run() error {
 
 	cors := server.CORSConfig{AllowOrigin: os.Getenv("CORS_ALLOWED_ORIGIN")}
 	router := server.NewRouter(routes, cors, log)
+
+	// Recengine: subscribes to changelog bus, emits Recommendations on
+	// doctrinal triggers per UI ADR 0002 §10. Writes via store; UI polls
+	// GET /api/v1/objects/Recommendation periodically (no SSE hand-off
+	// in v1).
+	rec := recengine.New(store, changelogBus, log.Named("recengine"))
+	rec.Start(ctx)
 
 	srv := server.New(cfg.Server, router, log.Named("server"))
 	srv.Start()
