@@ -529,7 +529,7 @@ function OntologySurface({
                 type="button"
                 onClick={() => onSelect(object)}
                 className={[
-                  'grid w-full grid-cols-[28px_72px_1fr_auto] items-center gap-2.5 border-b border-border px-3 py-2.5 text-left hover:bg-secondary',
+                  'grid w-full grid-cols-[28px_1fr_auto] items-center gap-2.5 border-b border-border px-3 py-2.5 text-left hover:bg-secondary',
                   selectedId === object._id ? 'bg-secondary' : '',
                 ].join(' ')}
               >
@@ -539,15 +539,12 @@ function OntologySurface({
                 >
                   <Icon className="size-3.5" strokeWidth={1.8} />
                 </span>
-                <span className="label-cap-sm text-muted-foreground">
-                  {object._type}
-                </span>
                 <span className="min-w-0">
                   <span className="text-foreground block truncate font-mono text-[12px] font-bold">
                     {objectName(object)}
                   </span>
                   <span className="text-muted-foreground block truncate font-mono text-[10px]">
-                    {object._source} · v{object._version}
+                    {registryRowSubtitle(object)}
                   </span>
                 </span>
                 <span className="border-border text-muted-foreground border px-1.5 py-0.5 font-mono text-[9px]">
@@ -1692,6 +1689,31 @@ function missionMilestones(objective: MissionObjective) {
       body: 'Summarize deltas, confidence, evidence gaps, and next decision.',
     },
   ];
+}
+
+// registryRowSubtitle returns the small grey line under the object's
+// name in the registry. Always shows the type discriminator + the
+// subtype the icon already encodes — same data the icon carries, in
+// text, so screen readers + keyboard scans still get it. Drops the
+// _source / _version that nobody scans for in this list.
+function registryRowSubtitle(object: AnyObject): string {
+  switch (object._type) {
+    case 'Entity':
+    case 'Event':
+    case 'Report':
+    case 'Unit':
+      return `${object._type} · ${object._subtype}`;
+    case 'Recommendation':
+      return `Recommendation · ${object.status}`;
+    case 'MissionObjective':
+      return `MissionObjective · ${object.priority}`;
+    case 'Plan':
+      return `Plan · ${object.status}`;
+    case 'Mission':
+      return `Mission · ${object.status}`;
+    case 'TaskingOrder':
+      return `TaskingOrder · ${object.status}`;
+  }
 }
 
 // registryRowMeta picks an icon + tone class for a registry row based
