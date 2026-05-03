@@ -1,0 +1,27 @@
+timestamp,iso_time,latitude,longitude,event_type,sub_event_type,actor1,actor2,fatalities,source
+1722904200,2024-08-06T00:30:00+00:00,51.215,35.273,Battles,Armed clash,UA forces,RU forces,0,synthetic_acled_schema
+1722907800,2024-08-06T01:30:00+00:00,51.198,35.301,Explosions/Remote violence,Shelling/artillery/missile attack,UA forces,RU forces,0,synthetic_acled_schema
+1722913200,2024-08-06T03:00:00+00:00,51.232,35.247,Battles,Armed clash,UA forces,RU forces,4,synthetic_acled_schema
+1722922200,2024-08-06T05:30:00+00:00,51.26,35.19,Battles,Government regains territory,UA forces,RU forces,8,synthetic_acled_schema
+1722931200,2024-08-06T08:00:00+00:00,51.305,35.084,Explosions/Remote violence,Air/drone strike,RU forces,UA forces,2,synthetic_acled_schema
+1722943800,2024-08-06T11:30:00+00:00,51.43,34.866,Battles,Armed clash,UA forces,RU forces,6,synthetic_acled_schema
+1722952800,2024-08-06T14:00:00+00:00,51.211,35.272,Strategic developments,Change to group/activity,UA forces,Civilians,0,synthetic_acled_schema
+1722967200,2024-08-06T18:00:00+00:00,51.512,35.208,Battles,Government regains territory,UA forces,RU forces,11,synthetic_acled_schema
+1722983400,2024-08-06T22:30:00+00:00,51.578,35.123,Explosions/Remote violence,Shelling/artillery/missile attack,RU forces,UA forces,1,synthetic_acled_schema
+1723003200,2024-08-07T04:00:00+00:00,51.482,34.94,Battles,Armed clash,UA forces,RU forces,3,synthetic_acled_schema
+1723019400,2024-08-07T08:30:00+00:00,51.612,35.18,Explosions/Remote violence,Air/drone strike,UA forces,RU forces,0,synthetic_acled_schema
+1723035600,2024-08-07T13:00:00+00:00,51.658,35.288,Battles,Armed clash,UA forces,RU forces,7,synthetic_acled_schema
+1723050000,2024-08-07T17:00:00+00:00,51.215,35.625,Battles,Armed clash,UA forces,RU forces,2,synthetic_acled_schema
+1723062600,2024-08-07T20:30:00+00:00,51.392,35.512,Explosions/Remote violence,Shelling/artillery/missile attack,RU forces,UA forces,4,synthetic_acled_schema
+1723084200,2024-08-08T02:30:00+00:00,51.58,35.42,Battles,Government regains territory,UA forces,RU forces,9,synthetic_acled_schema
+1723100400,2024-08-08T07:00:00+00:00,51.713,35.08,Explosions/Remote violence,Air/drone strike,UA forces,RU forces,1,synthetic_acled_schema
+1723118400,2024-08-08T12:00:00+00:00,51.298,35.73,Battles,Armed clash,UA forces,RU forces,5,synthetic_acled_schema
+1723141800,2024-08-08T18:30:00+00:00,51.418,35.605,Battles,Armed clash,UA forces,RU forces,0,synthetic_acled_schema
+1723161600,2024-08-09T00:00:00+00:00,51.605,35.318,Explosions/Remote violence,Shelling/artillery/missile attack,RU forces,UA forces,2,synthetic_acled_schema
+1723185000,2024-08-09T06:30:00+00:00,51.73,36.193,Explosions/Remote violence,Air/drone strike,UA forces,RU forces,0,synthetic_acled_schema
+1723204800,2024-08-09T12:00:00+00:00,51.815,36.06,Strategic developments,Disrupted weapons use,UA forces,RU forces,0,synthetic_acled_schema
+1723228200,2024-08-09T18:30:00+00:00,51.66,35.5,Battles,Armed clash,UA forces,RU forces,4,synthetic_acled_schema
+1723248000,2024-08-10T00:00:00+00:00,51.5,35.3,Battles,Armed clash,UA forces,RU forces,6,synthetic_acled_schema
+1723269600,2024-08-10T06:00:00+00:00,51.2,35.5,Explosions/Remote violence,Shelling/artillery/missile attack,RU forces,UA forces,1,synthetic_acled_schema
+1723291200,2024-08-10T12:00:00+00:00,51.8,36.2,Strategic developments,Change to group/activity,RU forces,Civilians,0,synthetic_acled_schema
+1723309200,2024-08-10T17:00:00+00:00,51.42,35.08,Explosions/Remote violence,Air/drone strike,UA forces,RU forces,3,synthetic_acled_schema

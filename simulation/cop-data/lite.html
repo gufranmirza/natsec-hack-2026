@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>COP Lite — Kursk Aug 6–10, 2024</title>
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+<style>
+  :root { --bg:#0f1217; --panel:rgba(15,19,26,0.92); --line:rgba(255,255,255,0.1);
+          --text:#e9eef5; --muted:#8b96a6; --accent:#d9b65d; }
+  html,body { margin:0; padding:0; height:100%; background:var(--bg); color:var(--text);
+              font:13px/1.4 -apple-system,system-ui,sans-serif; }
+  #map { position:absolute; inset:0; }
+  .panel { position:absolute; background:var(--panel); border:1px solid var(--line);
+           border-radius:8px; backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); }
+  #header { top:12px; left:12px; padding:10px 14px; }
+  #header b { font-weight:600; }
+  #header .sub { color:var(--muted); font-size:11px; margin-left:10px; }
+  #legend { top:12px; right:12px; padding:10px 14px; }
+  #legend h4 { margin:0 0 6px; font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); font-weight:500; }
+  #legend label { display:flex; align-items:center; gap:8px; padding:3px 0; font-size:12px; cursor:pointer; }
+  #legend input { margin:0; }
+  #legend .sw { width:12px; height:12px; border-radius:2px; }
+  #legend .sw.dot { border-radius:50%; width:9px; height:9px; }
+  #timebar { left:50%; bottom:18px; transform:translateX(-50%); padding:8px 14px;
+             display:flex; gap:12px; align-items:center; min-width:540px; }
+  #scrubber { flex:1; height:3px; }
+  #clock { font-variant-numeric:tabular-nums; color:var(--accent); font-size:12px; min-width:170px; }
+  .maplibregl-control-container { display:none; }
+  /* tooltip */
+  #tt { position:absolute; pointer-events:none; padding:8px 10px; font-size:11px;
+        background:var(--panel); border:1px solid var(--line); border-radius:6px;
+        max-width:240px; z-index:10; display:none; }
+  /* FPV panel — Cesium real-world 3D view from drone POV */
+  #fpv { right:12px; bottom:78px; width:380px; padding:0; overflow:hidden; }
+  #fpv .bar { display:flex; align-items:center; justify-content:space-between;
+              padding:8px 12px; border-bottom:1px solid var(--line); font-size:11px;
+              text-transform:uppercase; letter-spacing:0.08em; color:var(--muted); }
+  #fpv .bar b { color:var(--text); font-weight:600; letter-spacing:0.04em; text-transform:none; }
+  #fpv .state { font-size:10px; padding:2px 6px; border-radius:3px; background:rgba(110,220,200,0.18); color:#6edcc8; }
+  #fpv-frame { position:relative; width:380px; height:285px; background:#000; }
+  #cesium-container { width:100%; height:100%; }
+  #fpv-frame .hud { position:absolute; left:8px; right:8px; bottom:8px;
+                    display:flex; justify-content:space-between; font-size:10px;
+                    font-variant-numeric:tabular-nums; color:#fff; pointer-events:none;
+                    text-shadow:0 1px 2px rgba(0,0,0,0.8); letter-spacing:0.05em; }
+  #fpv-frame .crosshair { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+                          width:18px; height:18px; pointer-events:none; opacity:0.6; }
+  #fpv-frame .crosshair::before, #fpv-frame .crosshair::after {
+    content:''; position:absolute; background:#fff;
+  }
+  #fpv-frame .crosshair::before { left:50%; top:0; bottom:0; width:1px; transform:translateX(-50%); }
+  #fpv-frame .crosshair::after  { top:50%; left:0; right:0; height:1px; transform:translateY(-50%); }
+  /* hide cesium chrome */
+  .cesium-viewer-toolbar, .cesium-viewer-fullscreenContainer, .cesium-viewer-bottom,
+  .cesium-viewer-timelineContainer, .cesium-viewer-animationContainer,
+  .cesium-credit-lightbox-overlay { display:none !important; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="header" class="panel"><b>COP Lite</b><span class="sub">Kursk · 06–10 Aug 2024</span></div>
+<div id="legend" class="panel">
+  <h4>Layers</h4>
+  <label><input type="checkbox" data-layer="frontline" checked><span class="sw" style="background:#ff5a5a55;border:1px solid #ff5a5a"></span>RU control (real DeepStateMap)</label>
+  <label><input type="checkbox" data-layer="aircraft" checked><span class="sw dot" style="background:#4ea3ff"></span>Aircraft</label>
+  <label><input type="checkbox" data-layer="ground" checked><span class="sw dot" style="background:#6edcc8"></span>Ground convoys</label>
+  <label><input type="checkbox" data-layer="incidents" checked><span class="sw dot" style="background:#ff8a3a"></span>Incidents (ACLED-shape)</label>
+  <label><input type="checkbox" data-layer="thermal" checked><span class="sw dot" style="background:#ffd980"></span>Thermal (FIRMS-shape)</label>
+  <label><input type="checkbox" data-layer="drones" checked><span class="sw dot" style="background:#d9b65d;box-shadow:0 0 0 3px rgba(217,182,93,0.3)"></span>Drones <span style="color:var(--muted);font-size:10px;margin-left:4px">live</span></label>
+</div>
+<div id="timebar" class="panel">
+  <span style="color:var(--muted); font-size:11px">show window:</span>
+  <input id="scrubber" type="range" min="0" max="120" value="120" />
+  <span id="clock">all 5 days</span>
+</div>
+<div id="tt"></div>
+
+<div id="fpv" class="panel">
+  <div class="bar">
+    <span><b id="fpv-drone">drone-1 · ISR</b></span>
+    <span class="state">live · cesium</span>
+  </div>
+  <div id="fpv-frame">
+    <div id="cesium-container"></div>
+    <div class="crosshair"></div>
+    <div class="hud">
+      <span id="hud-pos">—</span>
+      <span id="hud-alt">—</span>
+      <span id="hud-hdg">—</span>
+    </div>
+  </div>
+</div>
+
+<link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.122/Build/Cesium/Widgets/widgets.css" />
+<script src="https://cesium.com/downloads/cesiumjs/releases/1.122/Build/Cesium/Cesium.js"></script>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script>
+const map = new maplibregl.Map({
+  container: 'map',
+  style: {
+    version: 8,
+    sources: {
+      esri: { type:'raster',
+              tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+              tileSize:256,
+              attribution:'© Esri, Maxar, Earthstar Geographics' },
+      labels: { type:'raster',
+                tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'],
+                tileSize:256 },
+    },
+    layers: [
+      { id:'imagery', type:'raster', source:'esri', maxzoom: 19 },
+      { id:'labels', type:'raster', source:'labels', paint:{'raster-opacity':0.8} },
+    ],
+  },
+  center:[35.4, 51.45],
+  zoom:7.5,
+  attributionControl:false,
+});
+
+let WINDOW_START, WINDOW_END;       // epoch seconds (overall demo span)
+let cutoff = null;                  // upper-bound filter; null = show everything
+let raw = {};                       // loaded data
+
+const tt = document.getElementById('tt');
+function showTip(x, y, html) { tt.style.left = (x+12)+'px'; tt.style.top = (y+12)+'px'; tt.innerHTML = html; tt.style.display='block'; }
+function hideTip() { tt.style.display='none'; }
+
+async function loadAll() {
+  const [a, g, f, i, th] = await Promise.all([
+    fetch('data/aircraft_tracks_kursk_aug2024.geojson').then(r=>r.json()),
+    fetch('data/ground_tracks_kursk_aug2024.geojson').then(r=>r.json()),
+    fetch('data/frontline_kursk_aug2024.geojson').then(r=>r.json()),
+    fetch('data/incidents_kursk_aug2024.csv').then(r=>r.text()).then(parseCSV),
+    fetch('data/thermal_anomalies_kursk_aug2024.csv').then(r=>r.text()).then(parseCSV),
+  ]);
+  raw = { aircraft:a, ground:g, frontline:f, incidents:i, thermal:th };
+
+  // overall time span
+  let t0 = Infinity, t1 = -Infinity;
+  for (const r of i) { const t = +r.timestamp; if (t<t0) t0=t; if (t>t1) t1=t; }
+  for (const r of th) { const t = +r.timestamp; if (t<t0) t0=t; if (t>t1) t1=t; }
+  WINDOW_START = t0; WINDOW_END = t1;
+
+  // Thin thermal — keep every 4th point. 520 → 130, plenty for demo, 4× lighter
+  raw.thermal = raw.thermal.filter((_, idx) => idx % 4 === 0);
+
+  buildSources();
+  applyFilter();
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split(/\r?\n/);
+  const header = lines.shift().split(',');
+  return lines.map(line => {
+    const cols = []; let cur='', q=false;
+    for (let c of line) {
+      if (c==='"') { q=!q; continue; }
+      if (c===',' && !q) { cols.push(cur); cur=''; continue; }
+      cur += c;
+    }
+    cols.push(cur);
+    const o = {}; header.forEach((h,k)=>o[h]=cols[k]); return o;
+  });
+}
+
+// Build full GeoJSON sources (no client-side rendering effects, just feature attrs)
+function buildSources() {
+  // Frontline polygons: keep all 5 with their date for filter
+  map.addSource('frontline', { type:'geojson', data:{type:'FeatureCollection', features:[]} });
+
+  // Aircraft tracks → LineString features (whole track)
+  // For lite mode we draw each track as one static line (no animation), with the kind property for color
+  const acLines = raw.aircraft.features.map(f => ({
+    type:'Feature',
+    properties: { ...f.properties, t_start: f.geometry.coordinates[0][3], t_end: f.geometry.coordinates.at(-1)[3] },
+    geometry: { type:'LineString', coordinates: f.geometry.coordinates.map(c => [c[0], c[1]]) },
+  }));
+  map.addSource('aircraft', { type:'geojson', data:{type:'FeatureCollection', features: acLines} });
+
+  // Ground tracks
+  const gLines = raw.ground.features.map(f => ({
+    type:'Feature',
+    properties: { ...f.properties, t_start: f.geometry.coordinates[0][3], t_end: f.geometry.coordinates.at(-1)[3] },
+    geometry: { type:'LineString', coordinates: f.geometry.coordinates.map(c => [c[0], c[1]]) },
+  }));
+  map.addSource('ground', { type:'geojson', data:{type:'FeatureCollection', features: gLines} });
+
+  // Incidents (points)
+  const incPts = raw.incidents.map(r => ({
+    type:'Feature',
+    properties:{ ...r, ts:+r.timestamp, fatalities:+r.fatalities||0 },
+    geometry:{ type:'Point', coordinates:[+r.longitude, +r.latitude] },
+  }));
+  map.addSource('incidents', { type:'geojson', data:{type:'FeatureCollection', features: incPts} });
+
+  // Thermal (points, thinned)
+  const thPts = raw.thermal.map(r => ({
+    type:'Feature',
+    properties:{ ts:+r.timestamp, frp:+r.frp||0, brightness:+r.brightness||0, sat:r.satellite },
+    geometry:{ type:'Point', coordinates:[+r.longitude, +r.latitude] },
+  }));
+  map.addSource('thermal', { type:'geojson', data:{type:'FeatureCollection', features: thPts} });
+
+  // ----- LAYERS (simple paint props, no extra GPU layers) -----
+  map.addLayer({
+    id:'frontline-fill', source:'frontline', type:'fill',
+    paint:{ 'fill-color':'#ff5a5a', 'fill-opacity':0.18 },
+  });
+  map.addLayer({
+    id:'frontline-line', source:'frontline', type:'line',
+    paint:{ 'line-color':'#ff5a5a', 'line-width':1.5, 'line-opacity':0.8 },
+  });
+  map.addLayer({
+    id:'ground-line', source:'ground', type:'line',
+    paint:{
+      'line-width':2,
+      'line-color':[
+        'match', ['get','kind'],
+        'ua_armor','#4ea3ff',
+        'ua_isr','#6edcc8',
+        'ru_logistics','#ff5a5a',
+        'ru_armor','#ff5a5a',
+        '#999999',
+      ],
+      'line-opacity':0.9,
+    },
+  });
+  map.addLayer({
+    id:'aircraft-line', source:'aircraft', type:'line',
+    paint:{
+      'line-width':1.2,
+      'line-color':[
+        'match', ['get','kind'],
+        'nato_isr','#4ea3ff',
+        'ru_strike','#ff5a5a',
+        'ru_aewc','#ff8a3a',
+        'ru_helo','#ff8a3a',
+        'civilian','#b4bcc8',
+        '#999999',
+      ],
+      'line-opacity':0.7,
+    },
+  });
+  // thermal points (small, soft yellow)
+  map.addLayer({
+    id:'thermal-pt', source:'thermal', type:'circle',
+    paint:{
+      'circle-radius':[ 'interpolate',['linear'],['get','frp'], 0,1.5, 50,4 ],
+      'circle-color':'#ffcd66',
+      'circle-opacity':0.55,
+      'circle-stroke-width':0,
+    },
+  });
+  // incidents (color by event type, size by fatalities)
+  map.addLayer({
+    id:'incidents-pt', source:'incidents', type:'circle',
+    paint:{
+      'circle-radius':['interpolate',['linear'],['get','fatalities'], 0,4, 11,9],
+      'circle-color':[
+        'case',
+        ['==', ['slice', ['get','event_type'], 0, 7], 'Battles'], '#ff5a5a',
+        ['==', ['slice', ['get','event_type'], 0, 10], 'Explosions'], '#ff8a3a',
+        '#d9b65d',
+      ],
+      'circle-stroke-color':'#ffffff',
+      'circle-stroke-width':1,
+      'circle-opacity':0.9,
+    },
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  //  LIVE DRONES — separate from the static layers above
+  //  This source is NOT loaded from a file. It's an in-memory
+  //  GeoJSON FeatureCollection that gets rebuilt every time we
+  //  receive a new position. In production, the position comes
+  //  from a WebSocket that a bridge populates with PX4 MAVLink
+  //  GLOBAL_POSITION_INT. Below is a stand-in that orbits a
+  //  fake drone in JavaScript so you can see the mechanism.
+  // ─────────────────────────────────────────────────────────────
+  map.addSource('drones', { type:'geojson', data:{type:'FeatureCollection', features:[]} });
+  map.addLayer({
+    id:'drones-trail', source:'drones', type:'line',
+    filter:['==', ['get','kind'], 'trail'],
+    paint:{ 'line-color':'#d9b65d', 'line-width':1.5, 'line-opacity':0.6 },
+  });
+  map.addLayer({
+    id:'drones-pt', source:'drones', type:'circle',
+    filter:['==', ['get','kind'], 'drone'],
+    paint:{
+      'circle-radius':6,
+      'circle-color':'#d9b65d',
+      'circle-stroke-color':'#ffffff',
+      'circle-stroke-width':2,
+      'circle-opacity':0.95,
+    },
+  });
+  map.addLayer({
+    id:'drones-label', source:'drones', type:'symbol',
+    filter:['==', ['get','kind'], 'drone'],
+    layout:{
+      'text-field':['get','label'],
+      'text-size':10,
+      'text-offset':[0, 1.4],
+      'text-anchor':'top',
+    },
+    paint:{ 'text-color':'#d9b65d', 'text-halo-color':'#000', 'text-halo-width':1.5 },
+  });
+
+  // ── stand-in: 3 fake drones flying meaningful demo routes on the real Kursk map.
+  //     drone-1: ISR loiter over Sudzha (the incursion crossing point)
+  //     drone-2: transit Sumy(UA staging) → Sudzha → Korenevo, mirroring the real
+  //              28th Ukrainian Mech Brigade thrust on Aug 6 2024
+  //     drone-3: low-altitude FPV recce around Korenevo
+  //  Routes chosen to lay over the real DeepStateMap frontline polygon so the
+  //  drones appear to be operating along the actual contact line.
+  const SUMY = [34.795, 50.907];
+  const SUDZHA = [35.273, 51.215];
+  const KORENEVO = [34.866, 51.430];
+  const LGOV = [35.288, 51.658];
+
+  function pathInterp(waypoints, fraction) {
+    // fraction in [0, 1]; loops back at end. Returns [lon, lat, heading_deg].
+    const f = ((fraction % 1) + 1) % 1;
+    const segF = f * (waypoints.length - 1);
+    const i = Math.min(Math.floor(segF), waypoints.length - 2);
+    const local = segF - i;
+    const a = waypoints[i], b = waypoints[i + 1];
+    const lon = a[0] + (b[0] - a[0]) * local;
+    const lat = a[1] + (b[1] - a[1]) * local;
+    const dx = (b[0] - a[0]) * Math.cos(lat * Math.PI / 180);
+    const dy = b[1] - a[1];
+    const hdg = (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
+    return [lon, lat, hdg];
+  }
+
+  const droneState = {
+    drone1: {
+      label:'drone-1 · ISR', kind:'drone', alt:380,
+      route: 'orbit', center: SUDZHA, radius: 0.04, periodS: 90,
+      _trail: [], _t0: performance.now(),
+    },
+    drone2: {
+      label:'drone-2 · TRANSIT', kind:'drone', alt:220,
+      route: 'path',
+      waypoints: [SUMY, [35.05, 51.10], SUDZHA, [35.10, 51.34], KORENEVO, [35.18, 51.55], LGOV],
+      periodS: 240,
+      _trail: [], _t0: performance.now() + 5000,
+    },
+    drone3: {
+      label:'drone-3 · FPV', kind:'drone', alt:80,
+      route: 'orbit', center: KORENEVO, radius: 0.025, periodS: 60,
+      _trail: [], _t0: performance.now() + 12000,
+    },
+  };
+
+  function tickDrones() {
+    const features = [];
+    for (const id of Object.keys(droneState)) {
+      const d = droneState[id];
+      const tSec = Math.max(0, (performance.now() - d._t0) / 1000);
+      let lon, lat, hdg;
+      if (d.route === 'orbit') {
+        const omega = (2 * Math.PI) / d.periodS;
+        lon = d.center[0] + d.radius * Math.cos(omega * tSec);
+        lat = d.center[1] + d.radius * Math.sin(omega * tSec) * 0.7;
+        hdg = ((omega * tSec * 180 / Math.PI) + 90) % 360;
+      } else {
+        const f = (tSec / d.periodS);
+        [lon, lat, hdg] = pathInterp(d.waypoints, f);
+      }
+      d.lon = lon; d.lat = lat; d.hdg = hdg;
+      d._trail.push([lon, lat]);
+      if (d._trail.length > 240) d._trail.shift();
+
+      if (d._trail.length > 1) {
+        features.push({
+          type:'Feature',
+          properties:{ kind:'trail', id },
+          geometry:{ type:'LineString', coordinates:[...d._trail] },
+        });
+      }
+      features.push({
+        type:'Feature',
+        properties:{ kind:'drone', id, label:d.label, alt:d.alt, hdg:Math.round(d.hdg) },
+        geometry:{ type:'Point', coordinates:[d.lon, d.lat] },
+      });
+    }
+    map.getSource('drones').setData({type:'FeatureCollection', features});
+    syncFpv();
+  }
+  setInterval(tickDrones, 200); // 5 Hz, exactly what real PX4 telemetry would push
+
+  // ─────────────────────────────────────────────────────────────
+  //  CESIUM FPV — real-world 3D rendering from the drone's POV.
+  //  No Gazebo. No fakes. Cesium loads actual elevation + actual
+  //  satellite imagery from public datasets and renders the view
+  //  as if a camera were physically at the drone's lat/lon/alt
+  //  pointing along its heading. Same data Google Earth uses.
+  //
+  //  No Ion token = uses Esri imagery + flat ellipsoid (no
+  //  terrain bumps, but Kursk Oblast is mostly flat steppe so
+  //  the visual difference is small). For real terrain bumps,
+  //  uncomment the Ion token line and create a free Cesium Ion
+  //  account at https://ion.cesium.com (~30 seconds, no card).
+  // ─────────────────────────────────────────────────────────────
+  // Cesium.Ion.defaultAccessToken = 'YOUR_FREE_ION_TOKEN_HERE';
+
+  let fpvDroneId = 'drone1';   // which drone's POV the panel shows
+  let cesiumViewer = null;
+
+  function initCesium() {
+    if (typeof Cesium === 'undefined') {
+      console.warn('Cesium not loaded yet'); return;
+    }
+    cesiumViewer = new Cesium.Viewer('cesium-container', {
+      baseLayer: Cesium.ImageryLayer.fromProviderAsync(
+        Promise.resolve(new Cesium.UrlTemplateImageryProvider({
+          url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+          maximumLevel: 19,
+          credit: 'Esri, Maxar, Earthstar Geographics',
+        }))
+      ),
+      terrainProvider: new Cesium.EllipsoidTerrainProvider(),
+      baseLayerPicker: false,
+      geocoder: false,
+      homeButton: false,
+      sceneModePicker: false,
+      navigationHelpButton: false,
+      animation: false,
+      timeline: false,
+      fullscreenButton: false,
+      infoBox: false,
+      selectionIndicator: false,
+      navigationInstructionsInitiallyVisible: false,
+    });
+    // hide stars / atmosphere ground (we're flying low-ish, this looks cleaner)
+    cesiumViewer.scene.skyBox.show = true;
+    cesiumViewer.scene.skyAtmosphere.show = true;
+    cesiumViewer.scene.fog.enabled = false;
+    cesiumViewer.scene.globe.showGroundAtmosphere = true;
+    // remove the cesium credit DOM clutter
+    const creditContainer = cesiumViewer._cesiumWidget?._creditContainer;
+    if (creditContainer) creditContainer.style.display = 'none';
+    syncFpv();
+  }
+
+  function syncFpv() {
+    if (!cesiumViewer) return;
+    const d = droneState[fpvDroneId];
+    if (!d || d.lon === undefined) return;
+    // camera position: at drone's lat/lon, alt in meters
+    const altM = d.alt || 200;
+    const headingRad = Cesium.Math.toRadians(d.hdg || 0);
+    const pitchRad = Cesium.Math.toRadians(-25); // slight downward tilt, like a typical drone gimbal
+    cesiumViewer.camera.setView({
+      destination: Cesium.Cartesian3.fromDegrees(d.lon, d.lat, altM),
+      orientation: { heading: headingRad, pitch: pitchRad, roll: 0 },
+    });
+    // HUD
+    document.getElementById('fpv-drone').textContent = d.label;
+    document.getElementById('hud-pos').textContent =
+      `${d.lat.toFixed(4)}°N ${d.lon.toFixed(4)}°E`;
+    document.getElementById('hud-alt').textContent = `${Math.round(altM)} m`;
+    document.getElementById('hud-hdg').textContent = `${Math.round(d.hdg || 0).toString().padStart(3,'0')}°`;
+  }
+
+  // initialize Cesium once the page is ready and the script is loaded
+  if (document.readyState === 'complete') initCesium();
+  else window.addEventListener('load', initCesium);
+
+  // ── REAL VERSION (commented out — uncomment when bridge is running):
+  // const ws = new WebSocket('ws://127.0.0.1:8092/drones');
+  // ws.onmessage = (ev) => {
+  //   const msg = JSON.parse(ev.data);   // {id, lat, lon, alt, hdg, ...}
+  //   const s = droneState[msg.id] || (droneState[msg.id] = {_trail:[]});
+  //   Object.assign(s, msg);
+  //   s._trail.push([msg.lon, msg.lat]); if (s._trail.length > 200) s._trail.shift();
+  //   tickDrones();   // re-render from droneState
+  // };
+
+  // hover tooltip on incidents
+  map.on('mousemove', 'incidents-pt', (e) => {
+    if (!e.features || !e.features[0]) return;
+    map.getCanvas().style.cursor='pointer';
+    const p = e.features[0].properties;
+    showTip(e.point.x, e.point.y,
+      `<b>${p.event_type}</b><br>${p.sub_event_type}<br>${p.actor1} vs ${p.actor2}<br>${p.iso_time}<br>fatalities: ${p.fatalities}`);
+  });
+  map.on('mouseleave', 'incidents-pt', () => { map.getCanvas().style.cursor=''; hideTip(); });
+}
+
+function applyFilter() {
+  // cutoff is the upper bound; null means "show everything"
+  const tCut = cutoff;
+  const inWindow = t => tCut === null || t <= tCut;
+
+  // Frontline: pick the most recent feature whose timestamp <= cutoff (or last if null)
+  let pick = null;
+  const frontFeats = raw.frontline.features;
+  if (tCut === null) {
+    pick = frontFeats[frontFeats.length - 1];
+  } else {
+    for (const f of frontFeats) {
+      const t = Math.floor(f.properties.timestamp / 1000);
+      if (t <= tCut && (!pick || f.properties.timestamp > pick.properties.timestamp)) pick = f;
+    }
+  }
+  map.getSource('frontline').setData({type:'FeatureCollection', features: pick ? [pick] : []});
+
+  // Aircraft / ground: include the line if track started before cutoff
+  const acFiltered = raw.aircraft.features.filter(f => inWindow(f.geometry.coordinates[0][3]));
+  const gFiltered = raw.ground.features.filter(f => inWindow(f.geometry.coordinates[0][3]));
+  map.getSource('aircraft').setData({type:'FeatureCollection',
+    features: acFiltered.map(f => ({type:'Feature', properties:f.properties,
+                                     geometry:{type:'LineString', coordinates:f.geometry.coordinates.map(c=>[c[0],c[1]])}}))});
+  map.getSource('ground').setData({type:'FeatureCollection',
+    features: gFiltered.map(f => ({type:'Feature', properties:f.properties,
+                                     geometry:{type:'LineString', coordinates:f.geometry.coordinates.map(c=>[c[0],c[1]])}}))});
+
+  // Incidents and thermal — point-by-point time filter
+  map.getSource('incidents').setData({type:'FeatureCollection',
+    features: raw.incidents.filter(r => inWindow(+r.timestamp)).map(r => ({
+      type:'Feature',
+      properties:{...r, fatalities:+r.fatalities||0, ts:+r.timestamp},
+      geometry:{type:'Point', coordinates:[+r.longitude, +r.latitude]},
+    }))});
+  map.getSource('thermal').setData({type:'FeatureCollection',
+    features: raw.thermal.filter(r => inWindow(+r.timestamp)).map(r => ({
+      type:'Feature',
+      properties:{ts:+r.timestamp, frp:+r.frp||0},
+      geometry:{type:'Point', coordinates:[+r.longitude, +r.latitude]},
+    }))});
+}
+
+// --- legend toggles ---
+document.querySelectorAll('#legend input').forEach(cb => {
+  cb.addEventListener('change', () => {
+    const layer = cb.dataset.layer;
+    const ids = {
+      frontline:['frontline-fill','frontline-line'],
+      aircraft:['aircraft-line'],
+      ground:['ground-line'],
+      incidents:['incidents-pt'],
+      thermal:['thermal-pt'],
+      drones:['drones-pt','drones-trail','drones-label'],
+    }[layer];
+    ids.forEach(id => map.setLayoutProperty(id, 'visibility', cb.checked ? 'visible' : 'none'));
+  });
+});
+
+// --- time scrubber: 0 .. 120 represents 0..5 days in 1-hour steps ---
+const fmtClock = (t) => {
+  if (t === null) return 'all 5 days';
+  const d = new Date(t * 1000);
+  const pad = n => String(n).padStart(2,'0');
+  return `≤ ${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:00 UTC`;
+};
+document.getElementById('scrubber').addEventListener('input', e => {
+  const v = +e.target.value;
+  cutoff = v >= 120 ? null : WINDOW_START + v * 3600;
+  document.getElementById('clock').textContent = fmtClock(cutoff);
+  applyFilter();
+});
+
+map.on('load', loadAll);
+</script>
+</body>
+</html>
