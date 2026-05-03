@@ -152,7 +152,9 @@ func (q *queryBuilder) applyCursor(c *Cursor) {
 }
 
 func (q *queryBuilder) applyOrderAndLimit(limit int) {
-	q.writef(" ORDER BY _ingested_at DESC, _id DESC LIMIT %s", q.bind(limit))
+	// LIMIT must be a literal in ClickHouse native SQL — not parameter-bound.
+	// `limit` is server-clamped to [1, 1000] so direct formatting is safe.
+	q.writef(" ORDER BY _ingested_at DESC, _id DESC LIMIT %d", limit)
 }
 
 // nextCursor returns the encoded cursor that points to the row *after* the
@@ -519,17 +521,18 @@ func (s *Store) WhereTaskingOrder(ctx context.Context, f Filter) (Page[*TaskingO
 // folding the link metadata into a `_link` view alongside each Unit.
 func (s *Store) LinkedUnitsForEntity(ctx context.Context, entityID string, limit int) ([]LinkedUnit, error) {
 	limit = clampLimit(limit)
-	q := `
+	// CH syntax requires alias *before* FINAL; LIMIT wants a literal int.
+	q := fmt.Sprintf(`
 		SELECT u._id, u._version, u._observed_at, u._ingested_at, u._source, u._source_ref, u._subtype,
 		       u.callsign, u.lat, u.lon, u.altitude_m, u.heading_deg, u.speed_mps, u.status,
 		       u.battery_pct, u.fuel_pct, u.capabilities,
 		       l._first_seen_at, l._last_seen_at, l._observation_count
-		FROM link_entity_observed_by_unit FINAL AS l
-		INNER JOIN unit FINAL AS u ON u._id = l._to_id
+		FROM link_entity_observed_by_unit AS l FINAL
+		INNER JOIN unit AS u FINAL ON u._id = l._to_id
 		WHERE l._from_id = ?
 		ORDER BY l._last_seen_at DESC
-		LIMIT ?`
-	rows, err := s.pool.Query(ctx, q, entityID, limit)
+		LIMIT %d`, limit)
+	rows, err := s.pool.Query(ctx, q, entityID)
 	if err != nil {
 		return nil, fmt.Errorf("query linked units: %w", err)
 	}
@@ -556,16 +559,16 @@ func (s *Store) LinkedUnitsForEntity(ctx context.Context, entityID string, limit
 // LinkedEntitiesForReport returns Entities referenced by the given report.
 func (s *Store) LinkedEntitiesForReport(ctx context.Context, reportID string, limit int) ([]LinkedEntity, error) {
 	limit = clampLimit(limit)
-	q := `
+	q := fmt.Sprintf(`
 		SELECT e._id, e._version, e._observed_at, e._ingested_at, e._source, e._source_ref, e._subtype,
 		       e.name, e.lat, e.lon, e.altitude_m, e.heading_deg, e.speed_mps, e.course_deg,
 		       e.confidence, e.threat_level, e.attributes,
 		       l._confidence
-		FROM link_report_references_entity FINAL AS l
-		INNER JOIN entity FINAL AS e ON e._id = l._to_id
+		FROM link_report_references_entity AS l FINAL
+		INNER JOIN entity AS e FINAL ON e._id = l._to_id
 		WHERE l._from_id = ?
-		LIMIT ?`
-	rows, err := s.pool.Query(ctx, q, reportID, limit)
+		LIMIT %d`, limit)
+	rows, err := s.pool.Query(ctx, q, reportID)
 	if err != nil {
 		return nil, fmt.Errorf("query linked entities: %w", err)
 	}
@@ -720,8 +723,7 @@ func (s *Store) Changelog(ctx context.Context, types []ObjectType, since time.Ti
 	}
 
 	full := strings.Join(parts, " UNION ALL ") +
-		" ORDER BY _ingested_at DESC, _id DESC LIMIT ?"
-	args = append(args, limit)
+		fmt.Sprintf(" ORDER BY _ingested_at DESC, _id DESC LIMIT %d", limit)
 
 	rows, err := s.pool.Query(ctx, full, args...)
 	if err != nil {
