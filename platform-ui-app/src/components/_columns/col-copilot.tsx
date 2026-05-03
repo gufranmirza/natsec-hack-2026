@@ -1,19 +1,18 @@
 'use client';
 
-// Column 3 (25%) — split vertically 50/50.
-//   TOP 50%: Recommendations panel (Anduril-shaped action cards)
-//   BOTTOM 50%: Copilot chat panel (Cursor-shaped streaming chat
-//               with Object chips inline + voice push-to-talk input)
+// Column 3 (25%) on the awareness/COP workspace — Recommendations panel
+// only (Anduril-shaped action cards). The chat surface that used to live
+// here was moved to the AI Intelligence tab; col-3 is now a single-purpose
+// HITL approve/reject column.
 //
-// Built on shadcn primitives: ScrollArea (Radix), Input, Button, Card.
+// Built on shadcn primitives: ScrollArea (Radix), Button, Card.
 
-import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, Mic, Pencil, Send, X } from 'lucide-react';
+import { useState } from 'react';
+import { ChevronDown, ChevronRight, Pencil, X } from 'lucide-react';
 
 import { ObjectChip } from '@/components/_ontology/object-chip';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { lookupObject } from '@/lib/fixtures';
 import type { AnyObject, Recommendation } from '@/types/ontology';
@@ -53,12 +52,6 @@ interface ColCopilotProps {
   onApprove: (rec: Recommendation) => void;
   onReject: (rec: Recommendation) => void;
   onModify: (rec: Recommendation) => void;
-  /** Send a chat query through the agent (control-plane → Azure OpenAI). */
-  onAskCopilot?: (text: string) => Promise<string | null>;
-  /** Triggered when the user taps the copilot mic — wired to the global voice handler. */
-  onVoiceCommand?: () => void;
-  /** Hint that voice capture is currently armed/listening. */
-  voiceListening?: boolean;
 }
 
 export function ColCopilot({
@@ -67,13 +60,9 @@ export function ColCopilot({
   onApprove,
   onReject,
   onModify,
-  onAskCopilot,
-  onVoiceCommand,
-  voiceListening,
 }: ColCopilotProps) {
   return (
     <aside className="bg-background flex h-full min-h-0 flex-col overflow-hidden">
-      {/* TOP 50%: Recommendations */}
       <RecommendationsPanel
         recommendations={recommendations}
         onSelect={onSelect}
@@ -81,16 +70,6 @@ export function ColCopilot({
         onReject={onReject}
         onModify={onModify}
       />
-
-      {/* BOTTOM 50%: Chat / Voice */}
-      <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <ChatPanel
-          onSelect={onSelect}
-          onAsk={onAskCopilot}
-          onMicClick={onVoiceCommand}
-          voiceListening={voiceListening}
-        />
-      </section>
     </aside>
   );
 }
@@ -128,7 +107,7 @@ function RecommendationsPanel({
         aria-expanded={open}
         aria-controls="recommendations-panel"
         onClick={() => setOpen((v) => !v)}
-        className="border-border bg-muted/30 hover:bg-muted/60 flex w-full shrink-0 items-baseline justify-between border-b px-3 py-1 text-left transition-colors"
+        className="border-border hover:bg-muted/30 flex w-full shrink-0 items-baseline justify-between border-b px-3 py-1 text-left transition-colors"
       >
         <span className="flex items-baseline gap-1.5">
           <ChevronDown
@@ -293,334 +272,6 @@ function RecommendationCard({
         </div>
       ) : null}
     </Card>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  CHAT PANEL                                                        */
-/* ------------------------------------------------------------------ */
-
-interface ChatMessage {
-  id: string;
-  role: 'assistant' | 'user';
-  ts: string; // "HH:MM:SS"
-  body: React.ReactNode; // pre-rendered (so the seed turn can include chips)
-  meta?: string;
-}
-
-function nowHMS(): string {
-  const d = new Date();
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-}
-function pad(n: number) {
-  return n.toString().padStart(2, '0');
-}
-function uid() {
-  return Math.random().toString(36).slice(2, 9);
-}
-
-function cannedReply(input: string): string {
-  const t = input.toLowerCase();
-  if (
-    t.includes('rook') ||
-    t.includes('intercept') ||
-    t.includes('vector') ||
-    t.includes('bogey')
-  ) {
-    return 'Acknowledged. Drafting tasking for ROOK-1 to intercept BOGEY-7. Stand-off 600m. Awaiting your approval in the recommendations panel.';
-  }
-  if (t.includes('v-117') || t.includes('vehicle') || t.includes('convoy')) {
-    return 'Re-tasking ROOK-2 for visual confirmation of V-117. ETA on-station 6m 18s.';
-  }
-  if (t.includes('p-04') || t.includes('person') || t.includes('ground')) {
-    return 'Hand-off cued to BRAVO-3 for ground confirmation. Bearing 311°, 1.2 NM.';
-  }
-  if (t.includes('what') || t.includes('?') || t.includes('status')) {
-    return 'Current picture: 1 hostile (BOGEY-7), 1 unknown vehicle track (V-117), 1 person of interest (P-04). 2 friendly drones (ROOK-1, ROOK-2). 1 ground unit (BRAVO-3). See map for live state.';
-  }
-  return 'Acknowledged. Holding for further input.';
-}
-
-interface ChatPanelProps {
-  onSelect: (o: AnyObject) => void;
-  /** Send a chat query through the agent (control-plane → Azure OpenAI). Returns the AI's spoken response text. */
-  onAsk?: (text: string) => Promise<string | null>;
-  /** Triggered when the user taps the chat mic — wired to the global voice handler. */
-  onMicClick?: () => void;
-  /** Hint that voice capture is currently armed/listening — flips the mic button visual. */
-  voiceListening?: boolean;
-}
-
-function ChatPanel({ onSelect, onAsk, onMicClick, voiceListening }: ChatPanelProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>(() => [
-    {
-      id: 'seed',
-      role: 'assistant',
-      ts: '14:23:08',
-      meta: '3 tools · grounded',
-      body: (
-        <>
-          Inbound contact{' '}
-          <ObjectChip
-            objectRef={{ _type: 'Entity', _id: 'ent_bogey7' }}
-            onSelect={onSelect}
-            compact
-          />{' '}
-          crossed the inner ring 46s ago, heading 225° descending.
-          Cross-correlated with{' '}
-          <ObjectChip
-            objectRef={{ _type: 'Report', _id: 'rep_002' }}
-            onSelect={onSelect}
-            compact
-          />{' '}
-          — L-band emission consistent with UAV control link. Recommend
-          stand-off intercept by{' '}
-          <ObjectChip
-            objectRef={{ _type: 'Unit', _id: 'unit_rook1' }}
-            onSelect={onSelect}
-            compact
-          />
-          .
-        </>
-      ),
-    },
-  ]);
-  const [input, setInput] = useState('');
-  const [isThinking, setIsThinking] = useState(false);
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
-
-  // Auto-scroll the Radix ScrollArea viewport to the bottom on new
-  // message. The viewport is queried via its data attribute since
-  // ScrollArea doesn't expose it directly via ref.
-  useEffect(() => {
-    const root = scrollAreaRef.current;
-    if (!root) return;
-    const viewport = root.querySelector(
-      '[data-radix-scroll-area-viewport]'
-    ) as HTMLElement | null;
-    if (viewport) {
-      viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
-    }
-  }, [messages, isThinking]);
-
-  const send = async () => {
-    const text = input.trim();
-    if (!text || isThinking) return;
-    setMessages((m) => [
-      ...m,
-      { id: uid(), role: 'user', ts: nowHMS(), body: text },
-    ]);
-    setInput('');
-    setIsThinking(true);
-
-    let replyText: string | null = null;
-    let meta = 'grounded · azure-openai';
-    try {
-      if (onAsk) {
-        replyText = await onAsk(text);
-      }
-    } catch {
-      replyText = null;
-    }
-    if (!replyText) {
-      // Server unreachable / agent disabled — keep the demo flowing
-      // with a minimal fallback that's clearly labeled.
-      replyText = cannedReply(text);
-      meta = 'grounded · canned (control plane offline)';
-    }
-    setMessages((m) => [
-      ...m,
-      {
-        id: uid(),
-        role: 'assistant',
-        ts: nowHMS(),
-        meta,
-        body: withChips(replyText, onSelect),
-      },
-    ]);
-    setIsThinking(false);
-  };
-
-  return (
-    <>
-      <header className="border-border bg-muted/30 flex shrink-0 items-baseline justify-between border-b px-4 py-1.5">
-        <div className="flex items-baseline gap-2">
-          <h2 className="text-foreground/90 label-cap">Copilot</h2>
-          <span className="text-muted-foreground/70 font-mono text-[10px]">
-            grounded · GPT-class
-          </span>
-        </div>
-        <span
-          className={`font-mono text-[10px] ${isThinking ? 'text-warning' : 'text-success'}`}
-        >
-          {isThinking ? 'THINKING…' : 'READY'}
-        </span>
-      </header>
-
-      <ScrollArea ref={scrollAreaRef} className="min-h-0 flex-1">
-        {messages.map((m) =>
-          m.role === 'assistant' ? (
-            <AssistantTurn key={m.id} message={m} />
-          ) : (
-            <UserTurn key={m.id} message={m} />
-          )
-        )}
-        {isThinking && <ThinkingDots />}
-      </ScrollArea>
-
-      <ChatInputBar
-        value={input}
-        onChange={setInput}
-        onSend={send}
-        disabled={isThinking}
-        onMicClick={onMicClick}
-        voiceListening={voiceListening}
-      />
-    </>
-  );
-}
-
-function AssistantTurn({ message }: { message: ChatMessage }) {
-  return (
-    <div className="border-border border-b px-4 py-3">
-      <div className="flex gap-2.5">
-        <div
-          aria-hidden
-          className="bg-primary text-primary-foreground flex size-5 shrink-0 items-center justify-center font-mono text-[10px] font-bold"
-        >
-          AI
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-foreground/90 text-[12.5px] leading-relaxed">
-            {message.body}
-          </p>
-          <span className="text-muted-foreground/60 mt-1 block font-mono text-[9px]">
-            {message.ts}
-            {message.meta ? ` · ${message.meta}` : ''}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function UserTurn({ message }: { message: ChatMessage }) {
-  return (
-    <div className="border-border bg-muted/20 border-b px-4 py-2.5">
-      <div className="flex gap-2.5">
-        <div
-          aria-hidden
-          className="border-border text-foreground/80 bg-card flex size-5 shrink-0 items-center justify-center border font-mono text-[10px] font-bold"
-        >
-          OP
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-foreground/95 text-[12.5px] leading-relaxed">
-            {message.body}
-          </p>
-          <span className="text-muted-foreground/60 mt-1 block font-mono text-[9px]">
-            {message.ts}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ThinkingDots() {
-  return (
-    <div className="border-border border-b px-4 py-3">
-      <div className="flex items-center gap-2.5">
-        <div
-          aria-hidden
-          className="bg-primary text-primary-foreground flex size-5 shrink-0 items-center justify-center font-mono text-[10px] font-bold"
-        >
-          AI
-        </div>
-        <div className="text-muted-foreground flex items-center gap-1 font-mono text-[10px]">
-          <span className="bg-muted-foreground/60 size-1 animate-pulse" />
-          <span
-            className="bg-muted-foreground/60 size-1 animate-pulse"
-            style={{ animationDelay: '120ms' }}
-          />
-          <span
-            className="bg-muted-foreground/60 size-1 animate-pulse"
-            style={{ animationDelay: '240ms' }}
-          />
-          <span className="ml-1.5">thinking…</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ChatInputBar({
-  value,
-  onChange,
-  onSend,
-  disabled,
-  onMicClick,
-  voiceListening,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  onSend: () => void;
-  disabled: boolean;
-  onMicClick?: () => void;
-  voiceListening?: boolean;
-}) {
-  return (
-    <div className="border-border bg-muted/20 shrink-0 border-t">
-      <div className="text-muted-foreground/70 flex items-center justify-between px-3 pt-1.5 font-mono text-[9px]">
-        <span>
-          Hold&nbsp;
-          <kbd className="border-border bg-card text-foreground border px-1 font-mono text-[9px]">
-            SPACE
-          </kbd>
-          &nbsp;to&nbsp;speak · brevity codes
-        </span>
-        <span>↵ send</span>
-      </div>
-
-      <form
-        className="flex items-stretch gap-1 p-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          onSend();
-        }}
-      >
-        <Input
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={
-            disabled ? 'Standing by…' : 'Ask the copilot, or describe the task…'
-          }
-          disabled={disabled}
-          className="flex-1"
-        />
-        <Button
-          type="button"
-          aria-label="Push to talk"
-          aria-pressed={voiceListening ? true : undefined}
-          className={`mic-breath ${voiceListening ? 'bg-warning text-background' : ''}`}
-          size="icon"
-          onClick={onMicClick}
-          disabled={!onMicClick}
-        >
-          <Mic className="size-3.5" strokeWidth={2.2} />
-        </Button>
-        <Button
-          type="submit"
-          aria-label="Send"
-          variant="outline"
-          size="icon"
-          disabled={disabled || !value.trim()}
-        >
-          <Send className="size-3.5" />
-        </Button>
-      </form>
-    </div>
   );
 }
 

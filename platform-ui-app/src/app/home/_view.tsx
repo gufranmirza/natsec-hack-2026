@@ -25,6 +25,7 @@ import {
 import { WorkspaceContextRail } from '@/components/_columns/workspace-context-rail';
 import { ObjectDrawer } from '@/components/_layout/object-drawer';
 import { OpStatusBar } from '@/components/_layout/op-status-bar';
+import { buildAiSuggestions } from '@/lib/ai-suggestions';
 import { ACTIVE_MISSION_ID } from '@/lib/fixtures';
 import { normalizeRecommendation } from '@/services/cp/recommendations/recommendations-api';
 import { useDemoData } from '@/services/cp/use-demo-data';
@@ -170,12 +171,23 @@ export function HomeView() {
   const [voiceArmed, setVoiceArmed] = useState(false);
   const [voiceListening, setVoiceListening] = useState(false);
   const [voiceTranscript, setVoiceTranscript] = useState(
-    'Try: give me an update on the last 10 minutes'
+    'Try: list every drone with status, battery, and capabilities'
   );
   const [activeFeedSource, setActiveFeedSource] =
     useState<DataSourceId>('radio');
   const [activeDroneFeed, setActiveDroneFeed] = useState<string | undefined>();
   const [aiAnswer, setAiAnswer] = useState<MissionAnswer | undefined>();
+  // Full transcript of agent answers, newest first. The AI Intelligence
+  // surface renders all of them so prior context isn't destroyed when a
+  // new query lands. Cleared explicitly via the surface's "Clear" action
+  // (or on a hard refresh).
+  const [aiAnswerHistory, setAiAnswerHistory] = useState<MissionAnswer[]>([]);
+  const [isAskingAi, setIsAskingAi] = useState(false);
+
+  const recordAiAnswer = useCallback((answer: MissionAnswer) => {
+    setAiAnswer(answer);
+    setAiAnswerHistory((prev) => [answer, ...prev]);
+  }, []);
   const [now, setNow] = useState(() => new Date());
 
   const activeMission =
@@ -265,6 +277,19 @@ export function HomeView() {
   // with the OP SILENT EYE picture. A real wiring will swap data
   // sources per tab.
   const isLiveTab = activeMissionId === ACTIVE_MISSION_ID;
+
+  // Grounded prompt set — same builder the AI Intelligence surface uses,
+  // so the top command bar's quick-prompts stay in sync with what the
+  // agent can actually answer well. Computed early so the voice fallback
+  // path (which fires when WebSpeech is unavailable) can reference it.
+  const commandBarPrompts = useMemo(
+    () =>
+      buildAiSuggestions(
+        { entities, units, events, reports, recommendations },
+        3
+      ).map((s) => s.prompt),
+    [entities, units, events, reports, recommendations]
+  );
 
   const handleSelect = useCallback((o: AnyObject) => {
     setSelected(o);
@@ -406,7 +431,7 @@ export function HomeView() {
 
       setSelected({ ...rec, status: 'accepted' });
       setDrawerOpen(true);
-      setAiAnswer({
+      recordAiAnswer({
         query: `Approve ${rec.verb} ${rec.short}`,
         response: `Approved. ${rec.asset_callsign ?? (unitId || 'Assigned asset')} was written to mission state and the approval event is now in the audit feed with recommendation ${rec._id}.`,
         sources: ['recommendation', 'operator action', 'mission audit'],
@@ -478,7 +503,7 @@ export function HomeView() {
       });
       setActiveDroneFeed(unitId);
       setWorkspace('drone_ops');
-      setAiAnswer({
+      recordAiAnswer({
         query: `Launch ${unit.callsign}`,
         response: `${unit.callsign} is now en route. Live simulated camera, flight coordinates, heading, speed, altitude, link quality, model cue, and frame telemetry are visible in Drone Ops.`,
         sources: ['operator action', 'drone telemetry', 'mission audit'],
@@ -522,7 +547,7 @@ export function HomeView() {
     });
     setActiveDroneFeed('unit_rook1');
     setWorkspace('drone_ops');
-    setAiAnswer({
+    recordAiAnswer({
       query: 'Coordinate swarm',
       response:
         'ROOK-1 and ROOK-2 are staged as a two-drone ISR swarm: overwatch plus offset confirmation. The command is human-approved and recorded in the audit feed.',
@@ -604,7 +629,7 @@ export function HomeView() {
       });
       setActiveFeedSource(sourceId);
       setWorkspace('integrations');
-      setAiAnswer({
+      recordAiAnswer({
         query: `Fuse ${SOURCE_SHORT_LABELS[sourceId]}`,
         response: `${SOURCE_SHORT_LABELS[sourceId]} refreshed. The integration surface now shows synthetic extracted objects, confidence scores, linked reports, and a mission event written to the local audit trail.`,
         sources: [
@@ -634,7 +659,7 @@ export function HomeView() {
       verb: 'Planned.',
     });
     setWorkspace('planning');
-    setAiAnswer({
+    recordAiAnswer({
       query: `Generate plan for ${activeMission._source_ref ?? activeMission.title}`,
       response:
         'Generated a contextual COA set with milestones, commander intent, assets, threat picture, and decision record for the selected mission.',
@@ -690,7 +715,7 @@ export function HomeView() {
     setSelected(entity);
     setDrawerOpen(true);
     setWorkspace('objects');
-    setAiAnswer({
+    recordAiAnswer({
       query: `Add object ${entity.name}`,
       response: `${entity.name} is now in the object graph and visible on the map at ${entity.position.join(', ')}. It carries unresolved status, low threat level, and an audit event.`,
       sources: ['operator object', 'object graph', 'map overlay'],
@@ -703,7 +728,7 @@ export function HomeView() {
   const handleRemoveObject = useCallback(
     (object: AnyObject) => {
       if (object._type !== 'Entity' || object._source !== 'operator-object') {
-        setAiAnswer({
+        recordAiAnswer({
           query: `Remove ${objectNameForAnswer(object)}`,
           response:
             'Only operator-created field objects can be removed in this demo. Fixture units, reports, events, and baseline tracks stay immutable for audit safety.',
@@ -735,7 +760,7 @@ export function HomeView() {
         current?._id === object._id ? (entities[0] ?? null) : current
       );
       setDrawerOpen(false);
-      setAiAnswer({
+      recordAiAnswer({
         query: `Remove ${object.name ?? object._id}`,
         response: `${object.name ?? object._id} was removed from the editable object layer. The removal is retained in the live feed as an audit event.`,
         sources: ['operator object', 'object graph', 'mission audit'],
@@ -763,6 +788,7 @@ export function HomeView() {
       const trimmed = rawQuery.trim();
       if (!trimmed) return null;
       setVoiceTranscript(trimmed);
+      setIsAskingAi(true);
 
       // The agent now reads live state from ClickHouse directly (see
       // platform-control-plane/internal/api/agent/azure.go — it generates
@@ -786,13 +812,14 @@ export function HomeView() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
+        // Setting isAskingAi=false is paired in finally below.
 
         if (!res.ok) {
           const message =
             res.status === 503
               ? 'Mission Commander agent disabled — Azure OpenAI not configured on the control plane.'
               : `Control plane returned ${res.status}.`;
-          setAiAnswer({
+          recordAiAnswer({
             query: trimmed,
             response: message,
             sources: ['platform-control-plane'],
@@ -815,7 +842,7 @@ export function HomeView() {
           for (const e of data.events) appendEvent(e as Event);
         }
 
-        setAiAnswer({
+        recordAiAnswer({
           query: trimmed,
           response: data.ai_response.text,
           sources: ['Mission Commander · Azure OpenAI gpt-4o'],
@@ -848,7 +875,7 @@ export function HomeView() {
       } catch {
         const message =
           'Cannot reach Mission Commander control plane. Start the platform-control-plane and retry.';
-        setAiAnswer({
+        recordAiAnswer({
           query: trimmed,
           response: message,
           sources: ['platform-control-plane'],
@@ -857,6 +884,8 @@ export function HomeView() {
           fromVoice,
         });
         return message;
+      } finally {
+        setIsAskingAi(false);
       }
     },
     [
@@ -874,6 +903,11 @@ export function HomeView() {
   const handleQuerySubmit = useCallback(
     (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
+      if (!query.trim()) return;
+      // The global command bar is reachable from every workspace, but
+      // answers render on the AI Intelligence surface — auto-switch so
+      // operators see the result of what they just asked.
+      setWorkspace('intelligence');
       submitMissionQuery(query, voiceArmed);
       setQuery('');
     },
@@ -917,8 +951,11 @@ export function HomeView() {
     const recognition = ensureRecognition();
 
     if (!recognition) {
-      // No browser support — keep the demo flowing with a canned query.
-      const fallback = 'Give me an update on everything that happened last 10 minutes';
+      // No browser support — keep the demo flowing with a canned grounded
+      // query. Picks the top live suggestion so the demo always has data.
+      const fallback =
+        commandBarPrompts[0] ??
+        'List every drone with callsign, status, battery_pct, fuel_pct, and capabilities.';
       setVoiceTranscript(fallback);
       submitMissionQuery(fallback, true);
       return;
@@ -969,7 +1006,7 @@ export function HomeView() {
         try { recognition.start(); } catch { /* noop */ }
       }, 120);
     }
-  }, [ensureRecognition, submitMissionQuery]);
+  }, [ensureRecognition, submitMissionQuery, commandBarPrompts]);
 
   // Clean up the recognition session if the page unmounts mid-listen.
   useEffect(() => {
@@ -1020,7 +1057,13 @@ export function HomeView() {
               />
               <button
                 type="button"
-                onClick={handleVoiceCommand}
+                onClick={() => {
+                  // Voice from the global bar lands in the AI tab; the
+                  // col-3 copilot mic and the AI hero mic stay where they
+                  // are because they call handleVoiceCommand directly.
+                  if (!voiceListening) setWorkspace('intelligence');
+                  handleVoiceCommand();
+                }}
                 className={[
                   'flex h-8 shrink-0 items-center gap-1.5 px-3 font-mono text-[11px] font-bold transition-colors',
                   voiceListening
@@ -1045,40 +1088,6 @@ export function HomeView() {
                 <Send className="size-3.5" />
                 Ask
               </button>
-            </div>
-            <div className="flex min-w-0 gap-1 overflow-x-auto">
-              {[
-                'Give me an update on the last 10 minutes',
-                'Launch ROOK-1 to investigate',
-                'What evidence supports this recommendation?',
-              ].map((prompt) => (
-                <button
-                  key={prompt}
-                  type="button"
-                  onClick={() => submitMissionQuery(prompt, false)}
-                  className="border-border bg-card hover:bg-secondary text-muted-foreground shrink-0 border px-2 py-1 font-mono text-[10px]"
-                >
-                  {prompt}
-                </button>
-              ))}
-            </div>
-            <div className="text-muted-foreground flex min-w-0 items-center gap-2 font-mono text-[10px]">
-              <span
-                className={[
-                  'size-1.5 shrink-0',
-                  voiceListening
-                    ? 'bg-warning animate-pulse'
-                    : voiceArmed
-                      ? 'bg-primary'
-                      : 'bg-muted-foreground',
-                ].join(' ')}
-              />
-              <span className="truncate">Voice command: {voiceTranscript}</span>
-              {aiAnswer ? (
-                <span className="text-primary ml-auto hidden min-w-0 max-w-[45%] truncate lg:block">
-                  Answer {_timeLabel(aiAnswer.generatedAt)}: {aiAnswer.response}
-                </span>
-              ) : null}
             </div>
           </div>
         </div>
@@ -1121,6 +1130,7 @@ export function HomeView() {
             reports={isLiveTab ? reports : []}
             recommendations={isLiveTab ? recommendations : []}
             aiAnswer={aiAnswer}
+            aiAnswerHistory={aiAnswerHistory}
             selectedId={selected?._id}
             activeFeedSource={activeFeedSource}
             activeDroneFeed={activeDroneFeed}
@@ -1134,6 +1144,11 @@ export function HomeView() {
             onViewObjectOnMap={handleViewObjectOnMap}
             onMissionSelect={setActiveMissionId}
             onAsk={submitMissionQuery}
+            isAskingAi={isAskingAi}
+            onVoiceCommand={handleVoiceCommand}
+            voiceListening={voiceListening}
+            voiceArmed={voiceArmed}
+            voiceTranscript={voiceTranscript}
           />
         </div>
 
@@ -1152,9 +1167,6 @@ export function HomeView() {
             onApprove={handleApproveRecommendation}
             onReject={handleRejectRecommendation}
             onModify={handleModifyRecommendation}
-            onAskCopilot={(text) => submitMissionQuery(text, false)}
-            onVoiceCommand={handleVoiceCommand}
-            voiceListening={voiceListening}
           />
         </div>
       </main>
@@ -1234,6 +1246,3 @@ function objectNameForAnswer(object: AnyObject) {
   return object.command_type;
 }
 
-function _timeLabel(iso: string) {
-  return iso.split('T')[1]?.slice(0, 8) ?? iso;
-}

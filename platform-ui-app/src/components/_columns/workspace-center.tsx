@@ -1062,7 +1062,7 @@ function IntelligenceSurface({
                 type="button"
                 onClick={() => setShowPrompts((v) => !v)}
                 aria-expanded={showPrompts}
-                className="border-border bg-muted/30 hover:bg-muted/60 flex w-full items-center justify-between border px-3 py-2 transition-colors"
+                className="border-border hover:bg-muted/30 flex w-full items-center justify-between border px-3 py-2 transition-colors"
               >
                 <div className="flex items-center gap-2">
                   <ChevronDown
@@ -1194,9 +1194,6 @@ export function LiveFeedStrip({
 }) {
   return (
     <div className="border-border bg-card flex shrink-0 items-stretch border-b">
-      <div className="bg-primary text-primary-foreground flex w-[76px] items-center justify-center font-mono text-[10px] font-bold uppercase">
-        Live
-      </div>
       <div className="divide-border grid min-w-0 flex-1 grid-cols-1 divide-y md:grid-cols-4 md:divide-x md:divide-y-0">
         {events.slice(0, 4).map((event, index) => (
           <button

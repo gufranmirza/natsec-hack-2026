@@ -704,7 +704,7 @@ export function Section({
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen((v) => !v)}
-        className="border-border bg-muted/30 hover:bg-muted/60 flex w-full shrink-0 items-baseline justify-between border-b px-3 py-1 text-left transition-colors"
+        className="border-border hover:bg-muted/30 flex w-full shrink-0 items-baseline justify-between border-b px-3 py-1 text-left transition-colors"
       >
         <span className="flex items-baseline gap-1.5">
           <ChevronDown
