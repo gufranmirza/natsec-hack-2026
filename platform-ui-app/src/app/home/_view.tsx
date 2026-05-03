@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Brain,
   Database,
@@ -19,6 +19,7 @@ import {
 import {
   type DataSourceId,
   LiveFeedStrip,
+  type MissionAnswer,
   WorkspaceCenter,
 } from '@/components/_columns/workspace-center';
 import { WorkspaceContextRail } from '@/components/_columns/workspace-context-rail';
@@ -85,6 +86,15 @@ const WORKSPACES: Array<{
   { id: 'intelligence', label: 'AI Intelligence', short: 'AI', icon: Brain },
 ];
 
+const SOURCE_SHORT_LABELS: Record<DataSourceId, string> = {
+  radio: 'radio traffic',
+  satellite: 'satellite imagery',
+  intel: 'intelligence reports',
+  social: 'public OSINT',
+  allies: 'allied communications',
+  drone_video: 'drone video',
+};
+
 export function HomeView() {
   const [activeMissionId, setActiveMissionId] =
     useState<string>(ACTIVE_MISSION_ID);
@@ -105,9 +115,23 @@ export function HomeView() {
   const [activeFeedSource, setActiveFeedSource] =
     useState<DataSourceId>('radio');
   const [activeDroneFeed, setActiveDroneFeed] = useState<string | undefined>();
+  const [aiAnswer, setAiAnswer] = useState<MissionAnswer | undefined>();
+  const [now, setNow] = useState(() => new Date());
 
   const activeMission =
     MISSIONS.find((m) => m._id === activeMissionId) ?? MISSIONS[0];
+  const missionElapsed = useMemo(
+    () => formatElapsed(activeMission._observed_at, now),
+    [activeMission._observed_at, now]
+  );
+  const utcTime =
+    now.toISOString().split('T')[1]?.slice(0, 8).concat('Z') ?? '';
+  const commsLatencyMs = 82 + (now.getUTCSeconds() % 8) * 4;
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
 
   // For v1 only OP SILENT EYE has full fixture data. Switching to
   // another tab updates chrome (tab highlight, status bar Op code,
@@ -133,6 +157,77 @@ export function HomeView() {
       ]);
     },
     []
+  );
+
+  const buildMissionAnswer = useCallback(
+    (trimmed: string, fromVoice: boolean): MissionAnswer => {
+      const lower = trimmed.toLowerCase();
+      const recent = events.slice(0, 5);
+      const pending = recommendations.find((rec) => rec.status === 'pending');
+      const drones = units.filter((unit) => unit._subtype === 'drone');
+      const sources = [
+        'drone telemetry',
+        'radio',
+        'satellite',
+        'intel reports',
+        'OSINT',
+        'object graph',
+      ];
+      let response =
+        `Current picture: ${entitiesCount(ENTITIES, 'hostile')} hostile track, ` +
+        `${entitiesCount(ENTITIES, 'unknown')} unresolved objects, ${drones.length} drones, ` +
+        `${reports.length} reports, and ${events.length} events indexed. `;
+      const actions = ['Open AI intelligence', 'Cite evidence refs'];
+
+      if (lower.includes('last 10') || lower.includes('update')) {
+        response =
+          `Last 10 minutes: ${recent.map((event) => event.description).join(' ')} ` +
+          `Highest-value delta is still ${pending?.asset_callsign ?? 'ROOK-1'} confirming BOGEY-7 with RF, EO/IR, and report support.`;
+        actions.push('Refresh mission synthesis');
+      } else if (lower.includes('evidence') || lower.includes('support')) {
+        response =
+          `${pending?.verb ?? 'Recommendation'} ${pending?.short ?? 'Retask ROOK-1'} is supported by ` +
+          `${pending?.evidence_refs.join(', ') ?? 'linked RF, report, and track evidence'}. ` +
+          `${pending?.rationale ?? 'The recommendation stays human-approved and ISR-only.'}`;
+        actions.push('Show evidence references');
+      } else if (lower.includes('cloud') || lower.includes('comms')) {
+        response =
+          'If cloud comms drop, local mission state, map layers, event feed, object graph, recommendations, and supervised drone tasking continue from the edge runtime. External feeds queue for later sync.';
+        actions.push('Explain degraded mode');
+      } else if (lower.includes('swarm')) {
+        response =
+          'Swarm tasking staged: ROOK-1 takes stand-off overwatch, ROOK-2 becomes offset observer, and both remain under human-approved ISR constraints.';
+        actions.push('Coordinate ROOK-1 + ROOK-2');
+      } else if (lower.includes('launch') && lower.includes('rook')) {
+        response =
+          'ROOK-1 launch command routed. The drone ops page now shows simulated EO/IR video, live coordinates, heading, speed, altitude, link quality, and frame telemetry.';
+        actions.push('Launch ROOK-1', 'Open live feed');
+      } else if (lower.includes('plan') || lower.includes('coa')) {
+        response = `Planning view opened for ${activeMission._source_ref ?? activeMission.title}. Milestones, commander intent, COA tradeoffs, assets, and decision records are now contextual to the selected mission.`;
+        actions.push('Generate COA', 'Review milestones');
+      } else if (lower.includes('fuse') || lower.includes('data')) {
+        response =
+          'Data fusion view opened. Click radio, satellite, intel, allied, OSINT, or drone video streams to replace the map with simulated extracted objects, reports, and audit events.';
+        actions.push('Open data fusion');
+      }
+
+      return {
+        query: trimmed,
+        response,
+        sources,
+        actions,
+        generatedAt: new Date().toISOString(),
+        fromVoice,
+      };
+    },
+    [
+      activeMission._source_ref,
+      activeMission.title,
+      events,
+      recommendations,
+      reports.length,
+      units,
+    ]
   );
 
   const handleApproveRecommendation = useCallback(
@@ -183,6 +278,15 @@ export function HomeView() {
       });
 
       setSelected({ ...rec, status: 'accepted' });
+      setDrawerOpen(true);
+      setAiAnswer({
+        query: `Approve ${rec.verb} ${rec.short}`,
+        response: `Approved. ${rec.asset_callsign ?? (unitId || 'Assigned asset')} was written to mission state and the approval event is now in the audit feed with recommendation ${rec._id}.`,
+        sources: ['recommendation', 'operator action', 'mission audit'],
+        actions: ['Recommendation marked approved', 'Drone tasking updated'],
+        generatedAt: new Date().toISOString(),
+        fromVoice: false,
+      });
     },
     [appendEvent]
   );
@@ -247,6 +351,14 @@ export function HomeView() {
       });
       setActiveDroneFeed(unitId);
       setWorkspace('drone_ops');
+      setAiAnswer({
+        query: `Launch ${unit.callsign}`,
+        response: `${unit.callsign} is now en route. Live simulated camera, flight coordinates, heading, speed, altitude, link quality, model cue, and frame telemetry are visible in Drone Ops.`,
+        sources: ['operator action', 'drone telemetry', 'mission audit'],
+        actions: ['Open live EO/IR feed', 'Write launch event'],
+        generatedAt: new Date().toISOString(),
+        fromVoice: false,
+      });
     },
     [activeMission._id, appendEvent, units]
   );
@@ -283,6 +395,15 @@ export function HomeView() {
     });
     setActiveDroneFeed('unit_rook1');
     setWorkspace('drone_ops');
+    setAiAnswer({
+      query: 'Coordinate swarm',
+      response:
+        'ROOK-1 and ROOK-2 are staged as a two-drone ISR swarm: overwatch plus offset confirmation. The command is human-approved and recorded in the audit feed.',
+      sources: ['drone fleet', 'operator action', 'mission audit'],
+      actions: ['Assign ROOK-1 overwatch', 'Assign ROOK-2 offset observer'],
+      generatedAt: new Date().toISOString(),
+      fromVoice: false,
+    });
   }, [activeMission._id, appendEvent]);
 
   const handleInjectFeed = useCallback(
@@ -356,6 +477,18 @@ export function HomeView() {
       });
       setActiveFeedSource(sourceId);
       setWorkspace('integrations');
+      setAiAnswer({
+        query: `Fuse ${SOURCE_SHORT_LABELS[sourceId]}`,
+        response: `${SOURCE_SHORT_LABELS[sourceId]} refreshed. The integration surface now shows synthetic extracted objects, confidence scores, linked reports, and a mission event written to the local audit trail.`,
+        sources: [
+          SOURCE_SHORT_LABELS[sourceId],
+          'object graph',
+          'mission audit',
+        ],
+        actions: ['Inject source refresh', 'Link BOGEY-7 evidence'],
+        generatedAt: new Date().toISOString(),
+        fromVoice: false,
+      });
     },
     [appendEvent]
   );
@@ -374,7 +507,16 @@ export function HomeView() {
       verb: 'Planned.',
     });
     setWorkspace('planning');
-  }, [appendEvent]);
+    setAiAnswer({
+      query: `Generate plan for ${activeMission._source_ref ?? activeMission.title}`,
+      response:
+        'Generated a contextual COA set with milestones, commander intent, assets, threat picture, and decision record for the selected mission.',
+      sources: ['mission objective', 'unit state', 'events', 'recommendations'],
+      actions: ['Open mission planning', 'Write planning event'],
+      generatedAt: new Date().toISOString(),
+      fromVoice: false,
+    });
+  }, [activeMission._source_ref, activeMission.title, appendEvent]);
 
   const submitMissionQuery = useCallback(
     (rawQuery: string, fromVoice = false) => {
@@ -382,6 +524,7 @@ export function HomeView() {
       if (!trimmed) return;
 
       const lower = trimmed.toLowerCase();
+      const answer = buildMissionAnswer(trimmed, fromVoice);
       if (lower.includes('swarm')) {
         handleLaunchSwarm();
       } else if (
@@ -419,10 +562,12 @@ export function HomeView() {
         },
         verb: 'Answered.',
       });
+      setAiAnswer(answer);
       setVoiceTranscript(trimmed);
     },
     [
       appendEvent,
+      buildMissionAnswer,
       events.length,
       handleGeneratePlan,
       handleLaunchDrone,
@@ -486,9 +631,9 @@ export function HomeView() {
         activeId={activeMissionId}
         onMissionSelect={setActiveMissionId}
         missionId={activeMission._source_ref ?? activeMission._id}
-        utcTime="14:23:47Z"
-        missionElapsed="T+02:14:09"
-        commsLatencyMs={92}
+        utcTime={utcTime}
+        missionElapsed={missionElapsed}
+        commsLatencyMs={commsLatencyMs}
         edgeState="synced"
         sensorCount={isLiveTab ? 9 : 0}
         threatCount={
@@ -506,7 +651,7 @@ export function HomeView() {
         <div className="bg-card hidden w-[76px] items-center justify-center border-r lg:flex">
           <span className="label-cap-sm text-muted-foreground">Command</span>
         </div>
-        <div className="bg-border grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_220px] gap-px">
+        <div className="bg-border grid min-w-0 flex-1 grid-cols-1 gap-px">
           <div className="bg-background flex min-w-0 flex-col gap-2 px-3 py-2">
             <div className="border-border bg-muted/30 flex min-w-0 flex-1 items-center gap-2 border px-2.5 py-2">
               <Brain className="text-primary size-4 shrink-0" />
@@ -516,6 +661,26 @@ export function HomeView() {
                 className="text-foreground placeholder:text-muted-foreground/70 min-w-0 flex-1 bg-transparent font-mono text-[12px] outline-none"
                 placeholder="Ask across drones, DeepState, radio, satellite, reports, OSINT, objects, plans..."
               />
+              <button
+                type="button"
+                onClick={handleVoiceCommand}
+                className={[
+                  'flex h-8 shrink-0 items-center gap-1.5 px-3 font-mono text-[11px] font-bold transition-colors',
+                  voiceListening
+                    ? 'bg-warning text-background'
+                    : voiceArmed
+                      ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                      : 'bg-warning/90 text-background hover:bg-warning',
+                ].join(' ')}
+                aria-label="Start voice command"
+              >
+                <Mic className="size-3.5" />
+                {voiceListening
+                  ? 'Listening'
+                  : voiceArmed
+                    ? 'Voice armed'
+                    : 'Voice'}
+              </button>
               <button
                 type="submit"
                 className="bg-primary text-primary-foreground hover:bg-primary/90 flex h-8 items-center gap-1.5 px-3 font-mono text-[11px] font-semibold"
@@ -540,28 +705,25 @@ export function HomeView() {
                 </button>
               ))}
             </div>
+            <div className="text-muted-foreground flex min-w-0 items-center gap-2 font-mono text-[10px]">
+              <span
+                className={[
+                  'size-1.5 shrink-0',
+                  voiceListening
+                    ? 'bg-warning animate-pulse'
+                    : voiceArmed
+                      ? 'bg-primary'
+                      : 'bg-muted-foreground',
+                ].join(' ')}
+              />
+              <span className="truncate">Voice command: {voiceTranscript}</span>
+              {aiAnswer ? (
+                <span className="text-primary ml-auto hidden min-w-0 max-w-[45%] truncate lg:block">
+                  Answer {_timeLabel(aiAnswer.generatedAt)}: {aiAnswer.response}
+                </span>
+              ) : null}
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={handleVoiceCommand}
-            className={[
-              'flex flex-col items-start justify-center gap-1 px-3 text-left transition-colors',
-              voiceListening
-                ? 'bg-primary text-primary-foreground'
-                : voiceArmed
-                  ? 'bg-primary/15 text-primary hover:bg-primary/20'
-                  : 'bg-card text-muted-foreground hover:bg-secondary',
-            ].join(' ')}
-            aria-label="Start voice command"
-          >
-            <span className="flex items-center gap-2 font-mono text-[11px] font-bold">
-              <Mic className="size-4" />
-              {voiceListening ? 'LISTENING' : 'VOICE COMMAND'}
-            </span>
-            <span className="line-clamp-2 text-[10px] leading-snug">
-              {voiceTranscript}
-            </span>
-          </button>
         </div>
       </form>
 
@@ -572,6 +734,9 @@ export function HomeView() {
           active={workspace}
           onSelect={setWorkspace}
           voiceArmed={voiceArmed}
+          voiceListening={voiceListening}
+          voiceTranscript={voiceTranscript}
+          onVoiceCommand={handleVoiceCommand}
         />
 
         {/* LEFT — orient (status surfaces, objective at top) */}
@@ -597,11 +762,14 @@ export function HomeView() {
           <WorkspaceCenter
             workspace={workspace}
             objective={activeMission}
+            missions={MISSIONS}
+            activeMissionId={activeMissionId}
             entities={isLiveTab ? ENTITIES : []}
             units={isLiveTab ? units : []}
             events={isLiveTab ? events : []}
             reports={isLiveTab ? reports : []}
             recommendations={isLiveTab ? recommendations : []}
+            aiAnswer={aiAnswer}
             selectedId={selected?._id}
             activeFeedSource={activeFeedSource}
             activeDroneFeed={activeDroneFeed}
@@ -610,6 +778,7 @@ export function HomeView() {
             onLaunchDrone={handleLaunchDrone}
             onLaunchSwarm={handleLaunchSwarm}
             onGeneratePlan={handleGeneratePlan}
+            onMissionSelect={setActiveMissionId}
             onAsk={submitMissionQuery}
           />
         </div>
@@ -647,10 +816,16 @@ function WorkspaceRail({
   active,
   onSelect,
   voiceArmed,
+  voiceListening,
+  voiceTranscript,
+  onVoiceCommand,
 }: {
   active: WorkspaceSectionId;
   onSelect: (id: WorkspaceSectionId) => void;
   voiceArmed: boolean;
+  voiceListening: boolean;
+  voiceTranscript: string;
+  onVoiceCommand: () => void;
 }) {
   return (
     <nav className="bg-background order-4 flex min-h-[72px] overflow-x-auto border-t lg:order-none lg:min-h-0 lg:flex-col lg:overflow-x-hidden lg:border-r lg:border-t-0">
@@ -679,17 +854,47 @@ function WorkspaceRail({
       })}
       <div className="border-border mt-auto hidden border-t p-2 lg:block">
         <div className="text-muted-foreground label-cap-sm mb-1">Voice</div>
-        <div
+        <button
+          type="button"
+          onClick={onVoiceCommand}
           className={[
-            'border px-1.5 py-1 text-center font-mono text-[10px]',
-            voiceArmed
-              ? 'border-primary bg-primary/10 text-primary'
-              : 'border-border text-muted-foreground',
+            'w-full border px-1.5 py-1 text-center font-mono text-[10px] transition-colors',
+            voiceListening
+              ? 'border-warning bg-warning text-background'
+              : voiceArmed
+                ? 'border-primary bg-primary/10 text-primary'
+                : 'border-border text-muted-foreground hover:bg-secondary',
           ].join(' ')}
         >
-          {voiceArmed ? 'ARMED' : 'STBY'}
+          {voiceListening ? 'LIVE' : voiceArmed ? 'ARMED' : 'STBY'}
+        </button>
+        <div className="text-muted-foreground mt-1 line-clamp-3 font-mono text-[9px] leading-snug">
+          {voiceTranscript}
         </div>
       </div>
     </nav>
   );
+}
+
+function formatElapsed(startIso: string, now: Date) {
+  const started = new Date(startIso).getTime();
+  const elapsedSeconds = Math.max(
+    0,
+    Math.floor((now.getTime() - started) / 1000)
+  );
+  const hours = Math.floor(elapsedSeconds / 3600);
+  const minutes = Math.floor((elapsedSeconds % 3600) / 60);
+  const seconds = elapsedSeconds % 60;
+  return `T+${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+function entitiesCount(
+  entities: typeof ENTITIES,
+  affiliation: (typeof ENTITIES)[number]['affiliation']
+) {
+  return entities.filter((entity) => entity.affiliation === affiliation).length;
+}
+
+function _timeLabel(iso: string) {
+  return iso.split('T')[1]?.slice(0, 8) ?? iso;
 }

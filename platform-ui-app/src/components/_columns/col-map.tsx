@@ -94,6 +94,7 @@ const MARKER_OFFSETS: Record<string, { x: number; y: number }> = {
 
 export function ColMap({ entities, units, selectedId, onSelect }: ColMapProps) {
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
   const [keplerStats, setKeplerStats] = useState({
     rows: 0,
     fields: 0,
@@ -128,19 +129,27 @@ export function ColMap({ entities, units, selectedId, onSelect }: ColMapProps) {
 
   return (
     <section className="relative h-full overflow-hidden bg-[hsl(220_12%_84%)]">
-      <TileMosaic tiles={tiles} />
+      <div
+        className="absolute inset-0 transition-transform duration-200 ease-out"
+        style={{
+          transform: `translate(${pan.x}px, ${pan.y}px) scale(1.08)`,
+          transformOrigin: 'center',
+        }}
+      >
+        <TileMosaic tiles={tiles} />
 
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(transparent_0,transparent_23px,hsl(220_20%_10%/0.065)_24px),linear-gradient(90deg,transparent_0,transparent_23px,hsl(220_20%_10%/0.055)_24px)] bg-[length:24px_24px]" />
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(transparent_0,transparent_23px,hsl(220_20%_10%/0.065)_24px),linear-gradient(90deg,transparent_0,transparent_23px,hsl(220_20%_10%/0.055)_24px)] bg-[length:24px_24px]" />
 
-      <DeepStateLayer paths={occupiedPaths} />
-      <MissionVectors entities={entities} units={units} />
-      <EnglishLabels />
-      <MissionMarkers
-        entities={entities}
-        units={units}
-        selectedId={selectedId}
-        onSelect={onSelect}
-      />
+        <DeepStateLayer paths={occupiedPaths} />
+        <MissionVectors entities={entities} units={units} />
+        <EnglishLabels />
+        <MissionMarkers
+          entities={entities}
+          units={units}
+          selectedId={selectedId}
+          onSelect={onSelect}
+        />
+      </div>
 
       <div className="border-border bg-card/95 absolute left-3 top-3 z-30 w-[256px] border px-3 py-2 backdrop-blur">
         <div className="label-cap-sm text-muted-foreground">
@@ -152,7 +161,7 @@ export function ColMap({ entities, units, selectedId, onSelect }: ColMapProps) {
         <div className="border-border mt-2 grid grid-cols-3 border-t pt-2">
           <MapMetric label="Source" value="DeepState" />
           <MapMetric label="Date" value={DEEPSTATE_DATE} />
-          <MapMetric label="Zoom" value={`Z${zoom}`} />
+          <MapMetric label="View" value={`Z${zoom} · ${pan.x},${pan.y}`} />
         </div>
       </div>
 
@@ -199,6 +208,58 @@ export function ColMap({ entities, units, selectedId, onSelect }: ColMapProps) {
           aria-label="Zoom out"
         >
           -
+        </button>
+      </div>
+
+      <div className="border-border bg-card/95 absolute bottom-3 right-14 z-30 grid grid-cols-3 border backdrop-blur">
+        <span className="size-8" />
+        <button
+          type="button"
+          onClick={() =>
+            setPan((current) => ({ ...current, y: current.y + 72 }))
+          }
+          className="border-border hover:bg-secondary grid size-8 place-items-center border-b border-l font-mono text-[12px] font-bold"
+          aria-label="Pan map up"
+        >
+          U
+        </button>
+        <button
+          type="button"
+          onClick={() => setPan({ x: 0, y: 0 })}
+          className="border-border hover:bg-secondary grid size-8 place-items-center border-b border-l font-mono text-[10px] font-bold"
+          aria-label="Reset map pan"
+        >
+          C
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            setPan((current) => ({ ...current, x: current.x + 72 }))
+          }
+          className="border-border hover:bg-secondary grid size-8 place-items-center border-t font-mono text-[12px] font-bold"
+          aria-label="Pan map left"
+        >
+          L
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            setPan((current) => ({ ...current, y: current.y - 72 }))
+          }
+          className="border-border hover:bg-secondary grid size-8 place-items-center border-l border-t font-mono text-[12px] font-bold"
+          aria-label="Pan map down"
+        >
+          D
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            setPan((current) => ({ ...current, x: current.x - 72 }))
+          }
+          className="border-border hover:bg-secondary grid size-8 place-items-center border-l border-t font-mono text-[12px] font-bold"
+          aria-label="Pan map right"
+        >
+          R
         </button>
       </div>
     </section>

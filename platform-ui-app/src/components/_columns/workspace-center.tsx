@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import {
   Brain,
   Camera,
@@ -41,14 +42,26 @@ export const SOURCE_LABELS: Record<DataSourceId, string> = {
   drone_video: 'Drone video',
 };
 
+export interface MissionAnswer {
+  query: string;
+  response: string;
+  sources: string[];
+  actions: string[];
+  generatedAt: string;
+  fromVoice: boolean;
+}
+
 interface WorkspaceCenterProps {
   workspace: WorkspaceSectionId;
   objective: MissionObjective;
+  missions: MissionObjective[];
+  activeMissionId: string;
   entities: Entity[];
   units: Unit[];
   events: Event[];
   reports: Report[];
   recommendations: Recommendation[];
+  aiAnswer?: MissionAnswer;
   selectedId?: string;
   activeFeedSource: DataSourceId;
   activeDroneFeed?: string;
@@ -57,17 +70,21 @@ interface WorkspaceCenterProps {
   onLaunchDrone: (unitId: string) => void;
   onLaunchSwarm: () => void;
   onGeneratePlan: () => void;
+  onMissionSelect: (id: string) => void;
   onAsk: (query: string, fromVoice?: boolean) => void;
 }
 
 export function WorkspaceCenter({
   workspace,
   objective,
+  missions,
+  activeMissionId,
   entities,
   units,
   events,
   reports,
   recommendations,
+  aiAnswer,
   selectedId,
   activeFeedSource,
   activeDroneFeed,
@@ -76,6 +93,7 @@ export function WorkspaceCenter({
   onLaunchDrone,
   onLaunchSwarm,
   onGeneratePlan,
+  onMissionSelect,
   onAsk,
 }: WorkspaceCenterProps) {
   if (workspace === 'integrations') {
@@ -117,11 +135,14 @@ export function WorkspaceCenter({
     return (
       <PlanningSurface
         objective={objective}
+        missions={missions}
+        activeMissionId={activeMissionId}
         units={units}
         entities={entities}
         events={events}
         recommendations={recommendations}
         onGeneratePlan={onGeneratePlan}
+        onMissionSelect={onMissionSelect}
       />
     );
   }
@@ -134,6 +155,7 @@ export function WorkspaceCenter({
         reports={reports}
         events={events}
         recommendations={recommendations}
+        aiAnswer={aiAnswer}
         onAsk={onAsk}
       />
     );
@@ -283,10 +305,39 @@ function DroneLiveSurface({
   onLaunchDrone: (unitId: string) => void;
   onLaunchSwarm: () => void;
 }) {
+  const [tick, setTick] = useState(0);
   const drone =
     units.find((unit) => unit._id === activeDroneFeed) ??
     units.find((unit) => unit._id === 'unit_rook1') ??
     units[0];
+  const drones = units.filter((unit) => unit._subtype === 'drone');
+  const now = new Date();
+  const heading = Math.round((drone?.heading_deg ?? 86) + ((tick % 11) - 5));
+  const speed = Math.max(0, Math.round((drone?.speed_mps ?? 22) + (tick % 5)));
+  const altitude = Math.max(
+    80,
+    Math.round((drone?.altitude_m ?? 420) + Math.sin(tick / 3) * 14)
+  );
+  const battery = Math.max(
+    8,
+    Math.round((drone?.battery_pct ?? 71) - tick * 0.03)
+  );
+  const lat = ((drone?.position[0] ?? 48.74) + Math.sin(tick / 11) * 0.006)
+    .toFixed(5)
+    .toString();
+  const lon = ((drone?.position[1] ?? 37.62) + Math.cos(tick / 9) * 0.007)
+    .toFixed(5)
+    .toString();
+  const linkQuality = Math.max(82, 98 - (tick % 9));
+  const frameId = 18420 + tick * 24;
+
+  useEffect(() => {
+    const id = window.setInterval(
+      () => setTick((current) => current + 1),
+      1000
+    );
+    return () => window.clearInterval(id);
+  }, []);
 
   return (
     <section className="bg-background flex h-full min-h-0 flex-col overflow-hidden">
@@ -318,29 +369,49 @@ function DroneLiveSurface({
               backgroundImage:
                 'linear-gradient(transparent 0, transparent 11px, hsl(180 80% 80% / 0.18) 12px)',
               backgroundSize: '100% 12px',
+              transform: `translateY(${tick % 12}px)`,
             }}
           />
-          <div className="border-success/70 absolute left-[18%] top-[22%] h-[22%] w-[28%] border">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0,transparent_24%,hsl(0_0%_0%/0.26)_72%)]" />
+          <div
+            className="border-success/70 absolute h-[22%] w-[28%] border"
+            style={{
+              left: `${18 + Math.sin(tick / 5) * 1.8}%`,
+              top: `${22 + Math.cos(tick / 6) * 1.4}%`,
+            }}
+          >
             <span className="bg-success text-background absolute -top-5 left-0 px-1.5 font-mono text-[10px] font-bold">
               VEHICLE SCAR
             </span>
           </div>
-          <div className="border-warning absolute left-[58%] top-[38%] h-[15%] w-[18%] border">
+          <div
+            className="border-warning absolute h-[15%] w-[18%] border"
+            style={{
+              left: `${58 + Math.cos(tick / 4) * 2.2}%`,
+              top: `${38 + Math.sin(tick / 4) * 1.8}%`,
+            }}
+          >
             <span className="bg-warning text-background absolute -top-5 left-0 px-1.5 font-mono text-[10px] font-bold">
               HEAT TRACE
             </span>
           </div>
-          <div className="text-primary absolute inset-x-10 bottom-8 grid grid-cols-4 gap-3 font-mono text-[11px]">
+          <div className="text-primary absolute inset-x-8 bottom-8 grid grid-cols-4 gap-2 font-mono text-[11px]">
             <CameraMetric label="MODE" value="EO/IR FUSED" />
-            <CameraMetric label="GRID" value="37U-DQ-842" />
-            <CameraMetric label="ALT" value={`${drone?.altitude_m ?? 420}m`} />
-            <CameraMetric label="LINK" value="EDGE LOCAL" />
+            <CameraMetric label="HDG/SPD" value={`${heading}deg ${speed}m/s`} />
+            <CameraMetric label="ALT" value={`${altitude}m`} />
+            <CameraMetric label="LINK" value={`${linkQuality}% LOCAL`} />
           </div>
           <div className="border-primary/70 absolute left-1/2 top-1/2 size-24 -translate-x-1/2 -translate-y-1/2 border">
             <span className="bg-primary absolute left-1/2 top-1/2 size-1 -translate-x-1/2 -translate-y-1/2" />
           </div>
+          <div className="text-primary/80 absolute left-5 top-5 font-mono text-[10px] leading-relaxed">
+            <div>LAT {lat}</div>
+            <div>LON {lon}</div>
+            <div>GIMBAL {-18 + (tick % 5)}deg</div>
+            <div>FRAME {frameId}</div>
+          </div>
           <div className="border-primary/60 bg-background/70 text-primary absolute right-5 top-5 border px-3 py-2 font-mono text-[10px]">
-            LIVE SIM · {new Date().toISOString().split('T')[1]?.slice(0, 8)}Z
+            LIVE SIM · {now.toISOString().split('T')[1]?.slice(0, 8)}Z
           </div>
         </div>
         <div className="bg-background min-h-0 overflow-y-auto">
@@ -361,15 +432,24 @@ function DroneLiveSurface({
           </div>
           <div className="p-4">
             <PanelTitle
-              title="Telemetry"
-              meta={`${units.filter((u) => u._subtype === 'drone').length} drones`}
+              title="Flight data stream"
+              meta={`${drones.length} drones · ${frameId}`}
             />
             <div className="mt-3 grid gap-2">
-              {units
-                .filter((unit) => unit._subtype === 'drone')
-                .map((unit) => (
-                  <TelemetryRow key={unit._id} unit={unit} />
-                ))}
+              <FlightDataRow label="Coordinates" value={`${lat}, ${lon}`} />
+              <FlightDataRow label="Heading" value={`${heading} deg true`} />
+              <FlightDataRow label="Ground speed" value={`${speed} m/s`} />
+              <FlightDataRow label="Altitude" value={`${altitude} m AGL`} />
+              <FlightDataRow label="Battery" value={`${battery}% est.`} />
+              <FlightDataRow
+                label="Video"
+                value={`24 fps · ${tick % 6}% loss`}
+              />
+              <FlightDataRow label="Model cue" value="tracklet BOGEY-7 / 87%" />
+              <div className="border-border my-1 border-t" />
+              {drones.map((unit) => (
+                <TelemetryRow key={unit._id} unit={unit} />
+              ))}
             </div>
           </div>
         </div>
@@ -394,6 +474,12 @@ function OntologySurface({
   onSelect: (o: AnyObject) => void;
 }) {
   const objects: AnyObject[] = [...entities, ...units, ...reports, ...events];
+  const selected =
+    objects.find((object) => object._id === selectedId) ??
+    entities.find((entity) => entity.threat_level === 'high') ??
+    objects[0];
+  const linked = selected ? linkedEvidence(selected, reports, events) : [];
+
   return (
     <section className="bg-background flex h-full min-h-0 flex-col overflow-hidden">
       <SurfaceHeader
@@ -441,39 +527,85 @@ function OntologySurface({
             />
           </div>
           <div className="mt-5 grid gap-3">
-            <PanelTitle title="Resolved relationships" meta="typed edges" />
+            {selected ? (
+              <div className="border-border bg-card border p-4">
+                <div className="mb-3 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="label-cap-sm text-muted-foreground">
+                      Selected object
+                    </div>
+                    <div className="text-foreground truncate font-mono text-[16px] font-bold">
+                      {objectName(selected)}
+                    </div>
+                  </div>
+                  <span className="border-border text-muted-foreground border px-2 py-1 font-mono text-[10px]">
+                    {selected._type} · {selected._id}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {objectFields(selected).map((field) => (
+                    <ObjectField
+                      key={`${selected._id}-${field.label}`}
+                      label={field.label}
+                      value={field.value}
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            <PanelTitle
+              title="Linked evidence"
+              meta={`${linked.length} refs`}
+            />
+            <div className="grid gap-2">
+              {linked.slice(0, 5).map((object) => (
+                <button
+                  key={object._id}
+                  type="button"
+                  onClick={() => onSelect(object)}
+                  className="border-border bg-card hover:bg-secondary border px-3 py-2 text-left"
+                >
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-foreground truncate font-mono text-[11px] font-bold">
+                      {objectName(object)}
+                    </span>
+                    <span className="text-muted-foreground font-mono text-[9px]">
+                      {object._type} · {_time(object._observed_at)}
+                    </span>
+                  </div>
+                  <p className="text-muted-foreground mt-1 line-clamp-2 text-[11px]">
+                    {object._type === 'Report'
+                      ? object.text
+                      : object.description}
+                  </p>
+                </button>
+              ))}
+              {linked.length === 0 ? (
+                <EvidenceCard
+                  title="No direct links yet"
+                  body="This object has no direct report/event references in the current synthetic fixture."
+                  meta="graph"
+                />
+              ) : null}
+            </div>
+
+            <PanelTitle title="Operational edges" meta="typed graph" />
             <GraphRow left="BOGEY-7" edge="observed_by" right="ROOK-1 EO" />
             <GraphRow
               left="BOGEY-7"
               edge="corroborated_by"
-              right="SIG-A + SOCIAL-17"
+              right="RF + OSINT + satellite"
             />
             <GraphRow
               left="V-117"
               edge="near_boundary"
               right="DeepState occupied terrain"
             />
-            <GraphRow left="P-04" edge="reported_by" right="BRAVO-3 TAC-3" />
             <GraphRow
               left="OP-SE-001"
               edge="tasks"
               right="ROOK-1 / ROOK-2 / BRAVO-3"
-            />
-          </div>
-          <div className="mt-5 grid gap-3">
-            <PanelTitle
-              title="Schema enforcement"
-              meta="control-plane objects"
-            />
-            <EvidenceCard
-              title="Identity resolution"
-              body="Callsigns, report refs, event refs, and unit tasking all resolve to ontology objects before appearing in recommendations."
-              meta="active"
-            />
-            <EvidenceCard
-              title="Auditability"
-              body="Every command, query, source injection, and approval writes a new event envelope with source, subtype, severity, payload, and timestamps."
-              meta="active"
             />
           </div>
         </div>
@@ -484,19 +616,27 @@ function OntologySurface({
 
 function PlanningSurface({
   objective,
+  missions,
+  activeMissionId,
   units,
   entities,
   events,
   recommendations,
   onGeneratePlan,
+  onMissionSelect,
 }: {
   objective: MissionObjective;
+  missions: MissionObjective[];
+  activeMissionId: string;
   units: Unit[];
   entities: Entity[];
   events: Event[];
   recommendations: Recommendation[];
   onGeneratePlan: () => void;
+  onMissionSelect: (id: string) => void;
 }) {
+  const milestones = missionMilestones(objective);
+
   return (
     <section className="bg-background flex h-full min-h-0 flex-col overflow-hidden">
       <SurfaceHeader
@@ -507,6 +647,38 @@ function PlanningSurface({
       />
       <div className="bg-border grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_340px] gap-px">
         <div className="bg-card min-h-0 overflow-y-auto p-5">
+          <div className="mb-4 grid grid-cols-3 gap-2">
+            {missions.slice(0, 3).map((mission) => {
+              const active = mission._id === activeMissionId;
+              return (
+                <button
+                  key={mission._id}
+                  type="button"
+                  onClick={() => onMissionSelect(mission._id)}
+                  className={[
+                    'border px-3 py-2 text-left',
+                    active
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : 'border-border bg-background hover:bg-secondary',
+                  ].join(' ')}
+                >
+                  <span className="block font-mono text-[11px] font-bold">
+                    {mission._source_ref ?? mission.title}
+                  </span>
+                  <span
+                    className={[
+                      'mt-1 block truncate font-mono text-[9px] uppercase',
+                      active
+                        ? 'text-primary-foreground/75'
+                        : 'text-muted-foreground',
+                    ].join(' ')}
+                  >
+                    {mission.status} · {mission.priority}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
           <div className="mb-4 flex items-start justify-between gap-4">
             <div>
               <div className="label-cap-sm text-muted-foreground">
@@ -543,9 +715,17 @@ function PlanningSurface({
           </div>
           <div className="mt-5">
             <PanelTitle
-              title="Context model"
-              meta="what the planner is using"
+              title="Mission milestones"
+              meta={`${milestones.filter((m) => m.state !== 'done').length} active`}
             />
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {milestones.map((milestone) => (
+                <MilestoneCard key={milestone.title} milestone={milestone} />
+              ))}
+            </div>
+          </div>
+          <div className="mt-5">
+            <PanelTitle title="Context model" meta="planner inputs" />
             <div className="mt-3 grid grid-cols-2 gap-3">
               <EvidenceCard
                 title="Terrain"
@@ -606,6 +786,7 @@ function IntelligenceSurface({
   reports,
   events,
   recommendations,
+  aiAnswer,
   onAsk,
 }: {
   entities: Entity[];
@@ -613,6 +794,7 @@ function IntelligenceSurface({
   reports: Report[];
   events: Event[];
   recommendations: Recommendation[];
+  aiAnswer?: MissionAnswer;
   onAsk: (query: string, fromVoice?: boolean) => void;
 }) {
   const corpus =
@@ -655,6 +837,28 @@ function IntelligenceSurface({
                 </button>
               ))}
             </div>
+          </div>
+          <div className="border-primary/50 bg-primary/5 mt-5 border p-4">
+            <div className="mb-2 flex items-baseline justify-between gap-3">
+              <h2 className="text-foreground font-mono text-[13px] font-bold">
+                {aiAnswer ? 'Mission answer' : 'Awaiting query'}
+              </h2>
+              <span className="text-muted-foreground font-mono text-[9px]">
+                {aiAnswer
+                  ? `${_time(aiAnswer.generatedAt)} · ${aiAnswer.fromVoice ? 'voice' : 'typed'}`
+                  : 'type or speak above'}
+              </span>
+            </div>
+            <p className="text-foreground/90 text-[13px] leading-relaxed">
+              {aiAnswer?.response ??
+                'Ask a natural-language question from the command bar or use one of the prompts above. The answer will cite the simulated mission objects it used.'}
+            </p>
+            {aiAnswer ? (
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <AnswerList title="Sources" items={aiAnswer.sources} />
+                <AnswerList title="Actions" items={aiAnswer.actions} />
+              </div>
+            ) : null}
           </div>
           <div className="mt-5 grid grid-cols-2 gap-3">
             <EvidenceCard
@@ -953,11 +1157,31 @@ function TelemetryRow({ unit }: { unit: Unit }) {
   );
 }
 
+function FlightDataRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="border-border bg-card grid grid-cols-[94px_1fr] gap-2 border px-3 py-2 font-mono text-[10px]">
+      <span className="text-muted-foreground uppercase">{label}</span>
+      <span className="text-foreground text-right font-bold">{value}</span>
+    </div>
+  );
+}
+
 function OntologyMetric({ label, value }: { label: string; value: number }) {
   return (
     <div className="border-border bg-card border px-3 py-2">
       <div className="label-cap-sm text-muted-foreground">{label}</div>
       <div className="text-foreground mt-1 font-mono text-[22px] font-bold">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function ObjectField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="border-border bg-background border px-3 py-2">
+      <div className="label-cap-sm text-muted-foreground">{label}</div>
+      <div className="text-foreground mt-1 truncate font-mono text-[11px] font-bold">
         {value}
       </div>
     </div>
@@ -978,6 +1202,46 @@ function GraphRow({
       <span className="text-foreground font-bold">{left}</span>
       <span className="text-muted-foreground text-center">{edge}</span>
       <span className="text-foreground text-right font-bold">{right}</span>
+    </div>
+  );
+}
+
+function MilestoneCard({
+  milestone,
+}: {
+  milestone: {
+    t: string;
+    title: string;
+    owner: string;
+    state: 'done' | 'active' | 'blocked' | 'queued';
+    body: string;
+  };
+}) {
+  const tone =
+    milestone.state === 'done'
+      ? 'text-success'
+      : milestone.state === 'active'
+        ? 'text-primary'
+        : milestone.state === 'blocked'
+          ? 'text-threat'
+          : 'text-muted-foreground';
+
+  return (
+    <div className="border-border bg-background border p-3">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-foreground font-mono text-[11px] font-bold">
+          {milestone.title}
+        </span>
+        <span className={`font-mono text-[9px] uppercase ${tone}`}>
+          {milestone.state}
+        </span>
+      </div>
+      <div className="text-muted-foreground mt-1 font-mono text-[9px]">
+        {milestone.t} · {milestone.owner}
+      </div>
+      <p className="text-muted-foreground mt-2 text-[11px] leading-snug">
+        {milestone.body}
+      </p>
     </div>
   );
 }
@@ -1004,6 +1268,24 @@ function CoaCard({
       <p className="text-muted-foreground mt-2 text-[12px] leading-relaxed">
         {body}
       </p>
+    </div>
+  );
+}
+
+function AnswerList({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div className="border-border bg-background border px-3 py-2">
+      <div className="label-cap-sm text-muted-foreground">{title}</div>
+      <div className="mt-1 flex flex-wrap gap-1">
+        {items.map((item) => (
+          <span
+            key={`${title}-${item}`}
+            className="border-border bg-card text-foreground border px-1.5 py-0.5 font-mono text-[9px]"
+          >
+            {item}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1050,6 +1332,203 @@ function InsightBlock({
       </div>
     </div>
   );
+}
+
+function objectFields(
+  object: AnyObject
+): Array<{ label: string; value: string }> {
+  const base = [
+    { label: 'Source', value: object._source },
+    { label: 'Observed', value: _time(object._observed_at) },
+    { label: 'Version', value: `v${object._version}` },
+  ];
+
+  if (object._type === 'Entity') {
+    return [
+      ...base,
+      { label: 'Affiliation', value: object.affiliation },
+      { label: 'Subtype', value: object._subtype },
+      { label: 'Confidence', value: `${Math.round(object.confidence * 100)}%` },
+      { label: 'Threat', value: object.threat_level },
+      { label: 'Position', value: object.position.join(', ') },
+      {
+        label: 'Kinematics',
+        value: `${object.heading_deg ?? '--'}deg · ${object.speed_mps ?? '--'}m/s`,
+      },
+    ];
+  }
+
+  if (object._type === 'Unit') {
+    return [
+      ...base,
+      { label: 'Callsign', value: object.callsign },
+      { label: 'Status', value: object.status },
+      { label: 'Health', value: object.health },
+      {
+        label: 'Battery/fuel',
+        value: `${object.battery_pct ?? object.fuel_pct ?? '--'}%`,
+      },
+      { label: 'Position', value: object.position.join(', ') },
+      { label: 'Capabilities', value: object.capabilities.join(', ') },
+    ];
+  }
+
+  if (object._type === 'Report') {
+    return [
+      ...base,
+      { label: 'Classification', value: object.classification },
+      { label: 'Subtype', value: object._subtype },
+      { label: 'Channel', value: object.channel ?? '--' },
+      { label: 'Entity refs', value: object.entity_refs?.join(', ') ?? '--' },
+      { label: 'Author', value: object.author ?? '--' },
+    ];
+  }
+
+  if (object._type === 'Event') {
+    return [
+      ...base,
+      { label: 'Subtype', value: object._subtype },
+      { label: 'Severity', value: object.severity },
+      { label: 'Entity', value: object.entity_id ?? '--' },
+      { label: 'Unit', value: object.unit_id ?? '--' },
+      {
+        label: 'Payload',
+        value: `${Object.keys(object.payload ?? {}).length} fields`,
+      },
+    ];
+  }
+
+  return base;
+}
+
+function linkedEvidence(
+  object: AnyObject,
+  reports: Report[],
+  events: Event[]
+): Array<Report | Event> {
+  if (object._type === 'Entity') {
+    return [
+      ...events.filter((event) => event.entity_id === object._id),
+      ...reports.filter((report) => report.entity_refs?.includes(object._id)),
+    ];
+  }
+
+  if (object._type === 'Unit') {
+    return events.filter((event) => event.unit_id === object._id);
+  }
+
+  if (object._type === 'Report') {
+    return events.filter((event) => event.payload?.report_id === object._id);
+  }
+
+  if (object._type === 'Event') {
+    return reports.filter(
+      (report) =>
+        (object.entity_id && report.entity_refs?.includes(object.entity_id)) ||
+        report._id === object.payload?.report_id
+    );
+  }
+
+  return [];
+}
+
+function missionMilestones(objective: MissionObjective) {
+  if (objective._id === 'obj_night_eagle') {
+    return [
+      {
+        t: 'T+00',
+        title: 'Open coastal watch',
+        owner: 'JADE cell',
+        state: 'active' as const,
+        body: 'Initialize long-range ISR lanes and confirm sector D-7 handoff windows.',
+      },
+      {
+        t: 'T+18',
+        title: 'Satellite pass',
+        owner: 'FUSE',
+        state: 'queued' as const,
+        body: 'Compare coastal change detection against latest allied radar returns.',
+      },
+      {
+        t: 'T+32',
+        title: 'Relief handoff',
+        owner: 'JADE-2',
+        state: 'queued' as const,
+        body: 'Transfer watch summary, unresolved objects, and route risks to relief crew.',
+      },
+      {
+        t: 'T+45',
+        title: 'Commander brief',
+        owner: 'AI',
+        state: 'queued' as const,
+        body: 'Generate five-bullet operational delta with evidence references.',
+      },
+    ];
+  }
+
+  if (objective._id === 'obj_red_horizon') {
+    return [
+      {
+        t: 'T-20',
+        title: 'SAR handoff',
+        owner: 'BRAVO',
+        state: 'done' as const,
+        body: 'Survivor extraction and route clearance were confirmed by ground unit.',
+      },
+      {
+        t: 'T+00',
+        title: 'After-action packet',
+        owner: 'AI',
+        state: 'active' as const,
+        body: 'Compile timeline, asset state, reports, and unresolved lessons.',
+      },
+      {
+        t: 'T+12',
+        title: 'Archive objects',
+        owner: 'FUSE',
+        state: 'queued' as const,
+        body: 'Freeze ontology versions and store final evidence bundle.',
+      },
+      {
+        t: 'T+30',
+        title: 'Release assets',
+        owner: 'OPS',
+        state: 'queued' as const,
+        body: 'Return ROOK spare battery allocation to common pool.',
+      },
+    ];
+  }
+
+  return [
+    {
+      t: 'T+00',
+      title: 'Stabilize picture',
+      owner: 'COP',
+      state: 'done' as const,
+      body: 'Fuse DeepState terrain, unit positions, RF cue, and latest reports into one view.',
+    },
+    {
+      t: 'T+02',
+      title: 'Confirm BOGEY-7',
+      owner: 'ROOK-1',
+      state: 'active' as const,
+      body: 'Launch stand-off EO/IR overwatch and maintain operator approval gate.',
+    },
+    {
+      t: 'T+06',
+      title: 'Resolve V-117',
+      owner: 'ROOK-2',
+      state: 'queued' as const,
+      body: 'Use offset observer if the vehicle track persists or crosses the route.',
+    },
+    {
+      t: 'T+12',
+      title: 'Update commander',
+      owner: 'AI',
+      state: 'queued' as const,
+      body: 'Summarize deltas, confidence, evidence gaps, and next decision.',
+    },
+  ];
 }
 
 function objectName(object: AnyObject) {
