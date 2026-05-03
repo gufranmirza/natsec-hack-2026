@@ -26,6 +26,7 @@ import { WorkspaceContextRail } from '@/components/_columns/workspace-context-ra
 import { ObjectDrawer } from '@/components/_layout/object-drawer';
 import { OpStatusBar } from '@/components/_layout/op-status-bar';
 import { ACTIVE_MISSION_ID } from '@/lib/fixtures';
+import { normalizeRecommendation } from '@/services/cp/recommendations/recommendations-api';
 import { useDemoData } from '@/services/cp/use-demo-data';
 import type {
   AnyObject,
@@ -218,29 +219,45 @@ export function HomeView() {
   }, []);
 
   useEffect(() => {
+    // Demo-mode fake physics only — when live CP is on, real position
+    // updates flow from the units query and this tick must not run.
+    if (seed.live) return;
     const DEMO_TIME_SCALE = 25;
     const TICK_MS = 1000;
+    const DRONE_SUBTYPES = new Set<Unit['_subtype']>([
+      'drone',
+      'drone_isr',
+      'drone_strike',
+    ]);
     const id = window.setInterval(() => {
       setUnits((current) =>
         current.map((unit) => {
-          if (unit._subtype !== 'drone') return unit;
+          if (!DRONE_SUBTYPES.has(unit._subtype)) return unit;
           const speed = unit.speed_mps ?? 0;
           if (speed <= 0) return unit;
+          const pos = unit.position;
+          if (
+            !Array.isArray(pos) ||
+            typeof pos[0] !== 'number' ||
+            typeof pos[1] !== 'number'
+          ) {
+            return unit;
+          }
           const heading = unit.heading_deg ?? 0;
           const meters = speed * (TICK_MS / 1000) * DEMO_TIME_SCALE;
           const dLat = (meters * Math.cos((heading * Math.PI) / 180)) / 111000;
           const dLon =
             (meters * Math.sin((heading * Math.PI) / 180)) /
-            (111000 * Math.cos((unit.position[0] * Math.PI) / 180));
+            (111000 * Math.cos((pos[0] * Math.PI) / 180));
           return {
             ...unit,
-            position: [unit.position[0] + dLat, unit.position[1] + dLon],
+            position: [pos[0] + dLat, pos[1] + dLon],
           };
         })
       );
     }, TICK_MS);
     return () => window.clearInterval(id);
-  }, []);
+  }, [seed.live]);
 
   // For v1 only OP SILENT EYE has full fixture data. Switching to
   // another tab updates chrome (tab highlight, status bar Op code,
@@ -789,10 +806,10 @@ export function HomeView() {
         const data: AgentQueryResponse = await res.json();
 
         if (data.recommendations?.length) {
-          setRecommendations((current) => [
-            ...(data.recommendations as Recommendation[]),
-            ...current,
-          ]);
+          const fresh = (data.recommendations as Recommendation[]).map(
+            normalizeRecommendation
+          );
+          setRecommendations((current) => [...fresh, ...current]);
         }
         if (data.events?.length) {
           for (const e of data.events) appendEvent(e as Event);
@@ -1070,14 +1087,7 @@ export function HomeView() {
       <LiveFeedStrip events={events} onSelect={handleSelect} />
 
       <main className="bg-border grid min-h-0 flex-1 grid-cols-1 gap-px overflow-y-auto lg:grid-cols-[76px_320px_minmax(0,1fr)_360px] lg:grid-rows-1 lg:overflow-hidden">
-        <WorkspaceRail
-          active={workspace}
-          onSelect={setWorkspace}
-          voiceArmed={voiceArmed}
-          voiceListening={voiceListening}
-          voiceTranscript={voiceTranscript}
-          onVoiceCommand={handleVoiceCommand}
-        />
+        <WorkspaceRail active={workspace} onSelect={setWorkspace} />
 
         {/* LEFT — orient (status surfaces, objective at top) */}
         <div className="order-2 min-h-[430px] overflow-hidden lg:order-1 lg:min-h-0">
@@ -1162,17 +1172,9 @@ export function HomeView() {
 function WorkspaceRail({
   active,
   onSelect,
-  voiceArmed,
-  voiceListening,
-  voiceTranscript,
-  onVoiceCommand,
 }: {
   active: WorkspaceSectionId;
   onSelect: (id: WorkspaceSectionId) => void;
-  voiceArmed: boolean;
-  voiceListening: boolean;
-  voiceTranscript: string;
-  onVoiceCommand: () => void;
 }) {
   return (
     <nav className="bg-background order-4 flex min-h-[72px] overflow-x-auto border-t lg:order-none lg:min-h-0 lg:flex-col lg:overflow-x-hidden lg:border-r lg:border-t-0">
@@ -1199,26 +1201,6 @@ function WorkspaceRail({
           </button>
         );
       })}
-      <div className="border-border mt-auto hidden border-t p-2 lg:block">
-        <div className="text-muted-foreground label-cap-sm mb-1">Voice</div>
-        <button
-          type="button"
-          onClick={onVoiceCommand}
-          className={[
-            'w-full border px-1.5 py-1 text-center font-mono text-[10px] transition-colors',
-            voiceListening
-              ? 'border-warning bg-warning text-background'
-              : voiceArmed
-                ? 'border-primary bg-primary/10 text-primary'
-                : 'border-border text-muted-foreground hover:bg-secondary',
-          ].join(' ')}
-        >
-          {voiceListening ? 'LIVE' : voiceArmed ? 'ARMED' : 'STBY'}
-        </button>
-        <div className="text-muted-foreground mt-1 line-clamp-3 font-mono text-[9px] leading-snug">
-          {voiceTranscript}
-        </div>
-      </div>
     </nav>
   );
 }
