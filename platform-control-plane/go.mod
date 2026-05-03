@@ -5,6 +5,7 @@ go 1.24.3
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.43.0
 	github.com/google/uuid v1.6.0
+	github.com/sashabaranov/go-openai v1.41.2
 	go.uber.org/zap v1.27.1
 )
 
