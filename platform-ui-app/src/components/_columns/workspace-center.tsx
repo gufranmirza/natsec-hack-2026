@@ -70,6 +70,9 @@ interface WorkspaceCenterProps {
   onLaunchDrone: (unitId: string) => void;
   onLaunchSwarm: () => void;
   onGeneratePlan: () => void;
+  onAddObject: () => void;
+  onRemoveObject: (object: AnyObject) => void;
+  onViewObjectOnMap: (object: AnyObject) => void;
   onMissionSelect: (id: string) => void;
   onAsk: (query: string, fromVoice?: boolean) => void;
 }
@@ -93,6 +96,9 @@ export function WorkspaceCenter({
   onLaunchDrone,
   onLaunchSwarm,
   onGeneratePlan,
+  onAddObject,
+  onRemoveObject,
+  onViewObjectOnMap,
   onMissionSelect,
   onAsk,
 }: WorkspaceCenterProps) {
@@ -127,6 +133,9 @@ export function WorkspaceCenter({
         events={events}
         selectedId={selectedId}
         onSelect={onSelect}
+        onAddObject={onAddObject}
+        onRemoveObject={onRemoveObject}
+        onViewObjectOnMap={onViewObjectOnMap}
       />
     );
   }
@@ -165,6 +174,7 @@ export function WorkspaceCenter({
     <ColMap
       entities={entities}
       units={units}
+      events={events}
       selectedId={selectedId}
       onSelect={onSelect}
     />
@@ -465,6 +475,9 @@ function OntologySurface({
   events,
   selectedId,
   onSelect,
+  onAddObject,
+  onRemoveObject,
+  onViewObjectOnMap,
 }: {
   entities: Entity[];
   units: Unit[];
@@ -472,6 +485,9 @@ function OntologySurface({
   events: Event[];
   selectedId?: string;
   onSelect: (o: AnyObject) => void;
+  onAddObject: () => void;
+  onRemoveObject: (object: AnyObject) => void;
+  onViewObjectOnMap: (object: AnyObject) => void;
 }) {
   const objects: AnyObject[] = [...entities, ...units, ...reports, ...events];
   const selected =
@@ -525,6 +541,35 @@ function OntologySurface({
               label="Evidence"
               value={reports.length + events.length}
             />
+          </div>
+          <div className="border-border bg-card mt-3 grid grid-cols-3 gap-px border">
+            <button
+              type="button"
+              onClick={onAddObject}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 px-3 py-2 font-mono text-[11px] font-bold"
+            >
+              Add object
+            </button>
+            <button
+              type="button"
+              disabled={!selected}
+              onClick={() => selected && onViewObjectOnMap(selected)}
+              className="bg-card hover:bg-secondary disabled:text-muted-foreground disabled:hover:bg-card px-3 py-2 font-mono text-[11px] font-bold disabled:opacity-50"
+            >
+              View on map
+            </button>
+            <button
+              type="button"
+              disabled={
+                !selected ||
+                selected._type !== 'Entity' ||
+                selected._source !== 'operator-object'
+              }
+              onClick={() => selected && onRemoveObject(selected)}
+              className="bg-card text-threat hover:bg-threat/10 disabled:text-muted-foreground disabled:hover:bg-card px-3 py-2 font-mono text-[11px] font-bold disabled:opacity-50"
+            >
+              Remove
+            </button>
           </div>
           <div className="mt-5 grid gap-3">
             {selected ? (

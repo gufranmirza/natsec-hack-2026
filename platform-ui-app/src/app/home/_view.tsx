@@ -36,6 +36,7 @@ import {
 } from '@/lib/fixtures';
 import type {
   AnyObject,
+  Entity,
   Event,
   Recommendation,
   Report,
@@ -99,6 +100,7 @@ export function HomeView() {
   const [activeMissionId, setActiveMissionId] =
     useState<string>(ACTIVE_MISSION_ID);
   const [workspace, setWorkspace] = useState<WorkspaceSectionId>('awareness');
+  const [entities, setEntities] = useState<Entity[]>(ENTITIES);
   const [units, setUnits] = useState<Unit[]>(UNITS);
   const [events, setEvents] = useState<Event[]>(EVENTS);
   const [reports, setReports] = useState<Report[]>(REPORTS);
@@ -174,8 +176,8 @@ export function HomeView() {
         'object graph',
       ];
       let response =
-        `Current picture: ${entitiesCount(ENTITIES, 'hostile')} hostile track, ` +
-        `${entitiesCount(ENTITIES, 'unknown')} unresolved objects, ${drones.length} drones, ` +
+        `Current picture: ${entitiesCount(entities, 'hostile')} hostile track, ` +
+        `${entitiesCount(entities, 'unknown')} unresolved objects, ${drones.length} drones, ` +
         `${reports.length} reports, and ${events.length} events indexed. `;
       const actions = ['Open AI intelligence', 'Cite evidence refs'];
 
@@ -224,6 +226,7 @@ export function HomeView() {
       activeMission._source_ref,
       activeMission.title,
       events,
+      entities,
       recommendations,
       reports.length,
       units,
@@ -518,6 +521,114 @@ export function HomeView() {
     });
   }, [activeMission._source_ref, activeMission.title, appendEvent]);
 
+  const handleAddObject = useCallback(() => {
+    const createdAt = new Date().toISOString();
+    const ordinal =
+      entities.filter((entity) => entity._source === 'operator-object').length +
+      1;
+    const entity: Entity = {
+      _type: 'Entity',
+      _id: `ent_manual_${Date.now()}`,
+      _version: 1,
+      _observed_at: createdAt,
+      _ingested_at: createdAt,
+      _source: 'operator-object',
+      _source_ref: `OBJ-${String(ordinal).padStart(3, '0')}`,
+      _subtype: 'Unknown',
+      affiliation: 'unknown',
+      name: `FIELD-OBJ-${String(ordinal).padStart(2, '0')}`,
+      position: [48.71 + (ordinal % 4) * 0.035, 37.52 + (ordinal % 5) * 0.045],
+      heading_deg: 210 + ordinal * 7,
+      speed_mps: 0,
+      confidence: 0.52,
+      threat_level: 'low',
+      attributes: {
+        status: 'operator-created',
+        grid: '37U-DQ-842',
+        disposition: 'unresolved',
+      },
+    };
+
+    setEntities((current) => [entity, ...current]);
+    appendEvent({
+      _id: `evt_object_add_${entity._id}`,
+      _observed_at: createdAt,
+      _ingested_at: createdAt,
+      _source: 'operator-object',
+      _subtype: 'report_link',
+      entity_id: entity._id,
+      position: entity.position,
+      severity: 'info',
+      description: `${entity.name} added to the ontology and projected onto the operational map.`,
+      payload: { action: 'add_object', object_id: entity._id },
+      verb: 'Object added.',
+    });
+    setSelected(entity);
+    setDrawerOpen(true);
+    setWorkspace('objects');
+    setAiAnswer({
+      query: `Add object ${entity.name}`,
+      response: `${entity.name} is now in the object graph and visible on the map at ${entity.position.join(', ')}. It carries unresolved status, low threat level, and an audit event.`,
+      sources: ['operator object', 'object graph', 'map overlay'],
+      actions: ['Create Entity', 'Project marker to map', 'Write audit event'],
+      generatedAt: createdAt,
+      fromVoice: false,
+    });
+  }, [appendEvent, entities]);
+
+  const handleRemoveObject = useCallback(
+    (object: AnyObject) => {
+      if (object._type !== 'Entity' || object._source !== 'operator-object') {
+        setAiAnswer({
+          query: `Remove ${objectNameForAnswer(object)}`,
+          response:
+            'Only operator-created field objects can be removed in this demo. Fixture units, reports, events, and baseline tracks stay immutable for audit safety.',
+          sources: ['object graph policy'],
+          actions: ['No deletion performed'],
+          generatedAt: new Date().toISOString(),
+          fromVoice: false,
+        });
+        return;
+      }
+
+      const removedAt = new Date().toISOString();
+      setEntities((current) =>
+        current.filter((entity) => entity._id !== object._id)
+      );
+      appendEvent({
+        _id: `evt_object_remove_${object._id}_${Date.now()}`,
+        _observed_at: removedAt,
+        _ingested_at: removedAt,
+        _source: 'operator-object',
+        _subtype: 'report_link',
+        entity_id: object._id,
+        severity: 'info',
+        description: `${object.name ?? object._id} removed from the live object layer and map overlay.`,
+        payload: { action: 'remove_object', object_id: object._id },
+        verb: 'Object removed.',
+      });
+      setSelected((current) =>
+        current?._id === object._id ? (entities[0] ?? null) : current
+      );
+      setDrawerOpen(false);
+      setAiAnswer({
+        query: `Remove ${object.name ?? object._id}`,
+        response: `${object.name ?? object._id} was removed from the editable object layer. The removal is retained in the live feed as an audit event.`,
+        sources: ['operator object', 'object graph', 'mission audit'],
+        actions: ['Remove map marker', 'Write removal event'],
+        generatedAt: removedAt,
+        fromVoice: false,
+      });
+    },
+    [appendEvent, entities]
+  );
+
+  const handleViewObjectOnMap = useCallback((object: AnyObject) => {
+    setSelected(object);
+    setDrawerOpen(false);
+    setWorkspace('awareness');
+  }, []);
+
   const submitMissionQuery = useCallback(
     (rawQuery: string, fromVoice = false) => {
       const trimmed = rawQuery.trim();
@@ -638,7 +749,8 @@ export function HomeView() {
         sensorCount={isLiveTab ? 9 : 0}
         threatCount={
           isLiveTab
-            ? ENTITIES.filter((e) => e.affiliation === 'hostile').length
+            ? entities.filter((entity) => entity.affiliation === 'hostile')
+                .length
             : 0
         }
         unitCount={isLiveTab ? units.length : 0}
@@ -745,7 +857,7 @@ export function HomeView() {
             workspace={workspace}
             objective={activeMission}
             units={isLiveTab ? units : []}
-            entities={isLiveTab ? ENTITIES : []}
+            entities={isLiveTab ? entities : []}
             events={isLiveTab ? events : []}
             reports={isLiveTab ? reports : []}
             selectedId={selected?._id}
@@ -764,7 +876,7 @@ export function HomeView() {
             objective={activeMission}
             missions={MISSIONS}
             activeMissionId={activeMissionId}
-            entities={isLiveTab ? ENTITIES : []}
+            entities={isLiveTab ? entities : []}
             units={isLiveTab ? units : []}
             events={isLiveTab ? events : []}
             reports={isLiveTab ? reports : []}
@@ -778,6 +890,9 @@ export function HomeView() {
             onLaunchDrone={handleLaunchDrone}
             onLaunchSwarm={handleLaunchSwarm}
             onGeneratePlan={handleGeneratePlan}
+            onAddObject={handleAddObject}
+            onRemoveObject={handleRemoveObject}
+            onViewObjectOnMap={handleViewObjectOnMap}
             onMissionSelect={setActiveMissionId}
             onAsk={submitMissionQuery}
           />
@@ -787,7 +902,7 @@ export function HomeView() {
         <div className="order-3 min-h-[560px] overflow-hidden lg:min-h-0">
           <WorkspaceContextRail
             workspace={workspace}
-            entities={isLiveTab ? ENTITIES : []}
+            entities={isLiveTab ? entities : []}
             units={isLiveTab ? units : []}
             events={isLiveTab ? events : []}
             reports={isLiveTab ? reports : []}
@@ -888,11 +1003,21 @@ function formatElapsed(startIso: string, now: Date) {
   return `T+${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
-function entitiesCount(
-  entities: typeof ENTITIES,
-  affiliation: (typeof ENTITIES)[number]['affiliation']
-) {
+function entitiesCount(entities: Entity[], affiliation: Entity['affiliation']) {
   return entities.filter((entity) => entity.affiliation === affiliation).length;
+}
+
+function objectNameForAnswer(object: AnyObject) {
+  if (object._type === 'Entity') return object.name ?? object._id;
+  if (object._type === 'Unit') return object.callsign;
+  if (object._type === 'Report') return object._source_ref ?? object._id;
+  if (object._type === 'Event') return object.verb ?? object._subtype;
+  if (object._type === 'Recommendation')
+    return `${object.verb} ${object.short}`;
+  if (object._type === 'MissionObjective') return object.title;
+  if (object._type === 'Plan') return object.title;
+  if (object._type === 'Mission') return object.intent;
+  return object.command_type;
 }
 
 function _timeLabel(iso: string) {

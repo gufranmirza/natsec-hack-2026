@@ -3,12 +3,13 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import deepStateOccupied from '@/lib/fixtures/deepstate-occupied-20260502.json';
-import type { AnyObject, Entity, LatLon, Unit } from '@/types/ontology';
+import type { AnyObject, Entity, Event, LatLon, Unit } from '@/types/ontology';
 import { MAP_VIEWBOX } from '@/types/ontology';
 
 interface ColMapProps {
   entities: Entity[];
   units: Unit[];
+  events: Event[];
   selectedId?: string;
   onSelect: (o: AnyObject) => void;
 }
@@ -92,7 +93,13 @@ const MARKER_OFFSETS: Record<string, { x: number; y: number }> = {
   'P-04': { x: -16, y: 2 },
 };
 
-export function ColMap({ entities, units, selectedId, onSelect }: ColMapProps) {
+export function ColMap({
+  entities,
+  units,
+  events,
+  selectedId,
+  onSelect,
+}: ColMapProps) {
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [keplerStats, setKeplerStats] = useState({
@@ -191,6 +198,8 @@ export function ColMap({ entities, units, selectedId, onSelect }: ColMapProps) {
           <span>fields {keplerStats.fields}</span>
         </div>
       </div>
+
+      <RealTimeMapFeed events={events} onSelect={onSelect} />
 
       <div className="border-border bg-card/95 absolute bottom-3 right-3 z-30 grid border backdrop-blur">
         <button
@@ -470,6 +479,66 @@ function MissionMarkers({
   );
 }
 
+function RealTimeMapFeed({
+  events,
+  onSelect,
+}: {
+  events: Event[];
+  onSelect: (o: AnyObject) => void;
+}) {
+  return (
+    <div className="border-border bg-card/95 absolute bottom-3 left-[304px] z-30 hidden w-[360px] border backdrop-blur xl:block">
+      <div className="border-border flex items-baseline justify-between border-b px-3 py-2">
+        <div>
+          <div className="label-cap-sm text-muted-foreground">
+            Real-time feed
+          </div>
+          <div className="text-foreground font-mono text-[11px] font-bold">
+            Latest mission deltas
+          </div>
+        </div>
+        <span className="text-primary font-mono text-[10px]">
+          {events.length} events
+        </span>
+      </div>
+      <div className="max-h-[236px] overflow-y-auto">
+        {events.slice(0, 8).map((event) => (
+          <button
+            key={event._id}
+            type="button"
+            onClick={() => onSelect(event)}
+            className="border-border hover:bg-secondary grid w-full grid-cols-[58px_1fr] gap-2 border-b px-3 py-2 text-left last:border-b-0"
+          >
+            <span className="text-muted-foreground font-mono text-[9px]">
+              {_time(event._observed_at)}
+            </span>
+            <span className="min-w-0">
+              <span className="flex items-center gap-2">
+                <span
+                  className={[
+                    'size-1.5 shrink-0',
+                    event.severity === 'critical'
+                      ? 'bg-threat'
+                      : event.severity === 'warn'
+                        ? 'bg-warning'
+                        : 'bg-primary',
+                  ].join(' ')}
+                />
+                <span className="text-foreground truncate font-mono text-[10px] font-bold">
+                  {event.verb ?? event._subtype}
+                </span>
+              </span>
+              <span className="text-muted-foreground mt-1 line-clamp-2 text-[10px] leading-snug">
+                {event.description}
+              </span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function MarkerButton({
   label,
   meta,
@@ -610,6 +679,10 @@ function toPath(points: LatLon[]) {
       return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
     })
     .join(' ');
+}
+
+function _time(iso: string) {
+  return iso.split('T')[1]?.slice(0, 8) ?? iso;
 }
 
 function MapMetric({ label, value }: { label: string; value: string }) {
