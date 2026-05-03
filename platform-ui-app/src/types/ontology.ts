@@ -94,9 +94,12 @@ export type EventSubtype =
   // kinetic
   | 'artillery_impact'
   | 'missile_launch'
+  | 'air_strike'
   | 'fpv_strike'
   | 'loitering_munition_engage'
   | 'small_arms_contact'
+  // ISR (additional — multi-source fusion)
+  | 'thermal_signature'
   // maneuver
   | 'ground_advance'
   | 'withdrawal'
