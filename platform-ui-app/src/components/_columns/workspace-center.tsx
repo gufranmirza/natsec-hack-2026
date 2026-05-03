@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   Brain,
   Camera,
+  ChevronDown,
   Crosshair,
   Database,
   Eye,
@@ -13,6 +14,8 @@ import {
   Globe,
   Heart,
   Lightbulb,
+  type LucideIcon,
+  Mic,
   Plane,
   PlaneTakeoff,
   Radar,
@@ -20,16 +23,18 @@ import {
   Rocket,
   Satellite,
   Search,
-  ShieldCheck,
+  Send,
   Truck,
   User,
   Users,
   Zap,
-  type LucideIcon,
 } from 'lucide-react';
 
 import { ColMap } from '@/components/_columns/col-map';
 import type { WorkspaceSectionId } from '@/components/_columns/col-status';
+import { MarkdownAnswer } from '@/components/_ontology/markdown-answer';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { buildAiSuggestions } from '@/lib/ai-suggestions';
 import type {
   AnyObject,
@@ -91,6 +96,12 @@ interface WorkspaceCenterProps {
   onViewObjectOnMap: (object: AnyObject) => void;
   onMissionSelect: (id: string) => void;
   onAsk: (query: string, fromVoice?: boolean) => void;
+  /** Voice props are threaded through so the AI Intelligence surface can host
+   * a hero mic without duplicating the global voice handler. */
+  onVoiceCommand?: () => void;
+  voiceListening?: boolean;
+  voiceArmed?: boolean;
+  voiceTranscript?: string;
 }
 
 export function WorkspaceCenter({
@@ -117,6 +128,10 @@ export function WorkspaceCenter({
   onViewObjectOnMap,
   onMissionSelect,
   onAsk,
+  onVoiceCommand,
+  voiceListening,
+  voiceArmed,
+  voiceTranscript,
 }: WorkspaceCenterProps) {
   if (workspace === 'integrations') {
     return (
@@ -182,6 +197,10 @@ export function WorkspaceCenter({
         recommendations={recommendations}
         aiAnswer={aiAnswer}
         onAsk={onAsk}
+        onVoiceCommand={onVoiceCommand}
+        voiceListening={voiceListening}
+        voiceArmed={voiceArmed}
+        voiceTranscript={voiceTranscript}
       />
     );
   }
@@ -256,7 +275,7 @@ function SourceDetailSurface({
             ))}
           </div>
         </div>
-        <div className="bg-background grid min-h-0 grid-rows-[auto_1fr_auto] overflow-hidden">
+        <div className="bg-background grid min-h-0 grid-rows-[auto_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] overflow-hidden">
           <div className="border-border border-b p-4">
             <div className="mb-3 flex items-center justify-between">
               <div>
@@ -302,21 +321,109 @@ function SourceDetailSurface({
               ) : null}
             </div>
           </div>
-          <div className="border-border border-t p-4">
-            <PanelTitle
-              title="Recent fusion events"
-              meta={`${sourceEvents.length} linked`}
-            />
-            <div className="mt-2 grid gap-1.5">
-              {sourceEvents.slice(0, 3).map((event) => (
-                <MiniEvent key={event._id} event={event} />
-              ))}
-            </div>
-          </div>
+          <FusionEventsPanel events={events} sourceEvents={sourceEvents} />
+          <FusionChangesPanel events={events} />
         </div>
       </div>
     </section>
   );
+}
+
+// FusionEventsPanel — every event in the mission graph, newest first.
+// Independent of the active source so the operator can watch the full
+// fusion churn while drilling into one source's feed table on the left.
+function FusionEventsPanel({
+  events,
+  sourceEvents,
+}: {
+  events: Event[];
+  sourceEvents: Event[];
+}) {
+  const newest = [...events].sort((a, b) =>
+    (b._observed_at ?? '').localeCompare(a._observed_at ?? '')
+  );
+  return (
+    <div className="border-border flex min-h-0 flex-col overflow-hidden border-t">
+      <div className="border-border bg-muted/20 flex shrink-0 items-baseline justify-between border-b px-4 py-2">
+        <span className="label-cap text-foreground/90">Mission events</span>
+        <span className="text-muted-foreground font-mono text-[10px]">
+          {newest.length} total · {sourceEvents.length} on this source
+        </span>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+        <div className="grid gap-1.5">
+          {newest.map((event) => (
+            <MiniEvent key={event._id} event={event} />
+          ))}
+          {newest.length === 0 ? (
+            <div className="text-muted-foreground py-4 text-center font-mono text-[11px]">
+              No events yet — fusion stream is quiet.
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// FusionChangesPanel — events that mutated downstream mission state
+// (operator actions, kinetic engagements, classification upgrades,
+// withdrawals). Pure observations (rf_ping / position_report / ais_gap)
+// are excluded — those are feeds, not deltas.
+function FusionChangesPanel({ events }: { events: Event[] }) {
+  const newest = [...events]
+    .sort((a, b) => (b._observed_at ?? '').localeCompare(a._observed_at ?? ''))
+    .filter(isStateChangeEvent);
+  return (
+    <div className="border-border flex min-h-0 flex-col overflow-hidden border-t">
+      <div className="border-border bg-muted/20 flex shrink-0 items-baseline justify-between border-b px-4 py-2">
+        <span className="label-cap text-foreground/90">What&apos;s changed</span>
+        <span className="text-muted-foreground font-mono text-[10px]">
+          {newest.length} state deltas
+        </span>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+        <div className="grid gap-1.5">
+          {newest.map((event) => (
+            <MiniEvent key={event._id} event={event} />
+          ))}
+          {newest.length === 0 ? (
+            <div className="text-muted-foreground py-4 text-center font-mono text-[11px]">
+              No state changes in the current window.
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const STATE_CHANGE_SUBTYPES = new Set<string>([
+  'classification_upgrade',
+  'track_acquired',
+  'track_lost',
+  'regained_track',
+  'artillery_impact',
+  'missile_launch',
+  'air_strike',
+  'fpv_strike',
+  'loitering_munition_engage',
+  'unit_destroyed',
+  'unit_damaged',
+  'casevac_request',
+  'medevac_dispatched',
+  'comms_outage',
+  'gps_denied_zone',
+  'jam_pulse',
+  'ground_advance',
+  'withdrawal',
+  'breach_attempt',
+  'defensive_consolidation',
+]);
+
+function isStateChangeEvent(event: Event): boolean {
+  if (STATE_CHANGE_SUBTYPES.has(event._subtype)) return true;
+  return event._source === 'operator-action';
 }
 
 function DroneLiveSurface({
@@ -888,6 +995,10 @@ function IntelligenceSurface({
   recommendations,
   aiAnswer,
   onAsk,
+  onVoiceCommand,
+  voiceListening,
+  voiceArmed,
+  voiceTranscript,
 }: {
   entities: Entity[];
   units: Unit[];
@@ -896,6 +1007,10 @@ function IntelligenceSurface({
   recommendations: Recommendation[];
   aiAnswer?: MissionAnswer;
   onAsk: (query: string, fromVoice?: boolean) => void;
+  onVoiceCommand?: () => void;
+  voiceListening?: boolean;
+  voiceArmed?: boolean;
+  voiceTranscript?: string;
 }) {
   const corpus =
     entities.length +
@@ -907,152 +1022,161 @@ function IntelligenceSurface({
     { entities, units, events, reports, recommendations },
     6
   );
+  const [text, setText] = useState('');
+  // Hide prompts once we have an answer — operator can re-open them.
+  const [showPrompts, setShowPrompts] = useState(!aiAnswer);
+
+  const submit = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    const q = text.trim();
+    if (!q) return;
+    onAsk(q, false);
+    setText('');
+  };
+
+  const micState = voiceListening
+    ? 'listening'
+    : voiceArmed
+      ? 'armed'
+      : 'ready';
   return (
     <section className="bg-background flex h-full min-h-0 flex-col overflow-hidden">
       <SurfaceHeader
         icon={Brain}
         eyebrow="Model layer"
         title="Search and reason across the mission"
-        meta={`${corpus} indexed objects · local context`}
+        meta={`${corpus} indexed objects · azure gpt-4o`}
       />
-      <div className="bg-border grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_320px] gap-px">
-        <div className="bg-card min-h-0 overflow-y-auto p-5">
-          <div className="border-border bg-background border p-4">
-            <div className="mb-3 flex items-center justify-between gap-2">
+      <div className="bg-card min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto flex max-w-3xl flex-col gap-6 p-6">
+          {/* HERO — voice-first ask block */}
+          <div className="border-border bg-background flex flex-col items-center border p-6 text-center">
+            <button
+              type="button"
+              onClick={onVoiceCommand}
+              disabled={!onVoiceCommand}
+              aria-pressed={!!voiceListening}
+              aria-label="Push to talk"
+              className={[
+                'mic-breath flex size-20 items-center justify-center rounded-full border-2 transition-colors',
+                voiceListening
+                  ? 'border-warning bg-warning text-background'
+                  : voiceArmed
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-primary bg-primary text-primary-foreground hover:bg-primary/90',
+                !onVoiceCommand ? 'cursor-not-allowed opacity-50' : '',
+              ].join(' ')}
+            >
+              <Mic className="size-9" strokeWidth={2} />
+            </button>
+            <div className="text-muted-foreground mt-3 font-mono text-[10px] uppercase tracking-wider">
+              {micState === 'listening'
+                ? 'Listening — speak now'
+                : micState === 'armed'
+                  ? 'Armed'
+                  : 'Hold to speak · or type below'}
+            </div>
+            {voiceTranscript ? (
+              <div className="text-foreground/90 mt-3 max-w-xl text-[13px] italic leading-snug">
+                &ldquo;{voiceTranscript}&rdquo;
+              </div>
+            ) : null}
+
+            <form
+              onSubmit={submit}
+              className="mt-5 flex w-full max-w-xl items-stretch gap-2"
+            >
+              <Input
+                type="text"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder="Ask the agent — e.g. &lsquo;summarize hostile entities by confidence&rsquo;"
+                className="flex-1"
+              />
+              <Button
+                type="submit"
+                aria-label="Send"
+                size="icon"
+                disabled={!text.trim()}
+              >
+                <Send className="size-3.5" />
+              </Button>
+            </form>
+          </div>
+
+          {/* ANSWER — only when present */}
+          {aiAnswer ? (
+            <div className="border-primary/50 bg-primary/5 border p-4">
+              <div className="mb-2 flex items-baseline justify-between gap-3">
+                <h2 className="text-foreground font-mono text-[13px] font-bold">
+                  Mission answer
+                </h2>
+                <span className="text-muted-foreground font-mono text-[9px]">
+                  {_time(aiAnswer.generatedAt)} ·{' '}
+                  {aiAnswer.fromVoice ? 'voice' : 'typed'}
+                </span>
+              </div>
+              <MarkdownAnswer
+                text={aiAnswer.response}
+                className="text-foreground/90 space-y-2 text-[13px]"
+              />
+              {aiAnswer.sources.length > 0 || aiAnswer.actions.length > 0 ? (
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <AnswerList title="Sources" items={aiAnswer.sources} />
+                  <AnswerList title="Actions" items={aiAnswer.actions} />
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {/* GROUNDED PROMPTS — collapsible; default open if no answer */}
+          <div className="border-border bg-background border">
+            <button
+              type="button"
+              onClick={() => setShowPrompts((v) => !v)}
+              aria-expanded={showPrompts}
+              className="border-border bg-muted/30 hover:bg-muted/60 flex w-full items-center justify-between border-b px-3 py-2 transition-colors"
+            >
               <div className="flex items-center gap-2">
-                <Search className="text-primary size-4" />
+                <ChevronDown
+                  className={[
+                    'text-muted-foreground/70 size-3 transition-transform',
+                    showPrompts ? '' : '-rotate-90',
+                  ].join(' ')}
+                  aria-hidden
+                />
+                <Search className="text-primary size-3.5" />
                 <span className="text-foreground font-mono text-[12px] font-bold">
-                  Mission-grounded queries
+                  Grounded prompts
                 </span>
               </div>
               <span className="text-muted-foreground font-mono text-[10px]">
-                derived from {corpus} indexed objects
+                {suggestions.length} · derived from {corpus} objects
               </span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {suggestions.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => onAsk(s.prompt)}
-                  className="border-border bg-card text-foreground hover:bg-secondary group relative border px-3 py-2 text-left text-[12px]"
-                >
-                  <span className="text-muted-foreground/80 mb-0.5 block font-mono text-[9px] uppercase">
-                    {s.category}
+            </button>
+            {showPrompts ? (
+              <div className="grid gap-2 p-3">
+                {suggestions.length === 0 ? (
+                  <span className="text-muted-foreground/70 px-1 font-mono text-[10px]">
+                    No grounded prompts — load mission state.
                   </span>
-                  {s.prompt}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="border-primary/50 bg-primary/5 mt-5 border p-4">
-            <div className="mb-2 flex items-baseline justify-between gap-3">
-              <h2 className="text-foreground font-mono text-[13px] font-bold">
-                {aiAnswer ? 'Mission answer' : 'Awaiting query'}
-              </h2>
-              <span className="text-muted-foreground font-mono text-[9px]">
-                {aiAnswer
-                  ? `${_time(aiAnswer.generatedAt)} · ${aiAnswer.fromVoice ? 'voice' : 'typed'}`
-                  : 'type or speak above'}
-              </span>
-            </div>
-            <p className="text-foreground/90 text-[13px] leading-relaxed">
-              {aiAnswer?.response ??
-                'Ask a natural-language question from the command bar or use one of the prompts above. The answer will cite the simulated mission objects it used.'}
-            </p>
-            {aiAnswer ? (
-              <div className="mt-3 grid grid-cols-2 gap-3">
-                <AnswerList title="Sources" items={aiAnswer.sources} />
-                <AnswerList title="Actions" items={aiAnswer.actions} />
+                ) : (
+                  suggestions.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => onAsk(s.prompt)}
+                      className="border-border bg-card hover:bg-secondary text-foreground flex items-baseline gap-3 border px-3 py-2 text-left text-[12px] leading-snug"
+                    >
+                      <span className="text-muted-foreground/80 w-14 shrink-0 font-mono text-[9px] uppercase">
+                        {s.category}
+                      </span>
+                      <span className="min-w-0 flex-1">{s.prompt}</span>
+                    </button>
+                  ))
+                )}
               </div>
             ) : null}
-          </div>
-          <div className="mt-5 grid grid-cols-2 gap-3">
-            <EvidenceCard
-              title="Retriever context"
-              body="Top-k context pulls from drone telemetry, reports, RF detections, map features, unit state, object graph edges, and recommendation rationale."
-              meta="RAG"
-            />
-            <EvidenceCard
-              title="Supervised kill-chain tools"
-              body="Detection, identification, recommendation, and ISR tasking are automated as visible steps; approval remains explicit and human-controlled."
-              meta="tools"
-            />
-            <EvidenceCard
-              title="Guardrails"
-              body="Recommendations stay explainable and require human approval. The model can draft ISR tasking, not silently execute engagement."
-              meta="HITL"
-            />
-            <EvidenceCard
-              title="Voice loop"
-              body="Push-to-talk transcribes command intent, routes it through the same parser, and logs an audit event with source voice-query."
-              meta="speech"
-            />
-          </div>
-        </div>
-        <div className="bg-background min-h-0 overflow-y-auto p-4">
-          <PanelTitle title="Current synthesis" meta="derived from feeds" />
-          <div className="mt-3 grid gap-3">
-            <InsightBlock
-              icon={Radar}
-              title="Most important change"
-              value={
-                (() => {
-                  const lastCritical = events.find(
-                    (e) => e.severity === 'critical' || e.severity === 'warn'
-                  );
-                  if (lastCritical) {
-                    return lastCritical.description ?? lastCritical._subtype;
-                  }
-                  if (events.length > 0) {
-                    return `${events.length} events streaming · last: ${events[0]?._subtype ?? 'unknown'}`;
-                  }
-                  return 'No events ingested yet.';
-                })()
-              }
-            />
-            <InsightBlock
-              icon={Plane}
-              title="Best next ISR action"
-              value={
-                (() => {
-                  const topPending = recommendations.find(
-                    (r) => r.status === 'pending'
-                  );
-                  if (topPending) {
-                    const conf = Math.round((topPending.confidence ?? 0) * 100);
-                    return `${topPending.short ?? topPending.proposed_action_type} · ${conf}% confidence`;
-                  }
-                  const onStation = units.filter(
-                    (u) => u._subtype === 'drone' && u.status === 'on_station'
-                  ).length;
-                  return onStation > 0
-                    ? `${onStation} drone${onStation > 1 ? 's' : ''} on station — no pending tasking`
-                    : 'No drones on station, nothing pending.';
-                })()
-              }
-            />
-            <InsightBlock
-              icon={ShieldCheck}
-              title="Human decision required"
-              value={
-                (() => {
-                  const pendingCount = recommendations.filter(
-                    (r) => r.status === 'pending'
-                  ).length;
-                  if (pendingCount > 0) {
-                    return `${pendingCount} recommendation${pendingCount > 1 ? 's' : ''} awaiting approval.`;
-                  }
-                  const acceptedRecent = recommendations.filter(
-                    (r) => r.status === 'accepted'
-                  ).length;
-                  if (acceptedRecent > 0) {
-                    return `All clear — ${acceptedRecent} action${acceptedRecent > 1 ? 's' : ''} approved this mission.`;
-                  }
-                  return 'No decisions outstanding.';
-                })()
-              }
-            />
           </div>
         </div>
       </div>
@@ -1492,26 +1616,6 @@ function TimelineBlock({
   );
 }
 
-function InsightBlock({
-  icon: Icon,
-  title,
-  value,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  value: string;
-}) {
-  return (
-    <div className="border-border bg-card border p-3">
-      <Icon className="text-primary mb-2 size-4" />
-      <div className="label-cap-sm text-muted-foreground">{title}</div>
-      <div className="text-foreground mt-1 text-[12px] leading-snug">
-        {value}
-      </div>
-    </div>
-  );
-}
-
 function objectFields(
   object: AnyObject
 ): Array<{ label: string; value: string }> {
@@ -1740,9 +1844,7 @@ function registryRowSubtitle(object: AnyObject): string {
       // ("radio · LIGHTNING / FIRES-NET" reads more meaningfully than
       // "Report · radio").
       const author = object.author ?? object.channel;
-      return author
-        ? `${object._subtype} · ${author}`
-        : object._subtype;
+      return author ? `${object._subtype} · ${author}` : object._subtype;
     }
     case 'Event':
       return `${object._subtype} · ${object.severity}`;
@@ -1763,9 +1865,9 @@ function registryRowSubtitle(object: AnyObject): string {
 // of the row, before the time stamp). undefined → no pill rendered.
 // Tone semantics match col-status: threat=red, warning=amber,
 // success=green, primary=blue, muted=grey.
-function registryRowAccent(object: AnyObject):
-  | { label: string; tone: string }
-  | undefined {
+function registryRowAccent(
+  object: AnyObject
+): { label: string; tone: string } | undefined {
   switch (object._type) {
     case 'Entity':
       return {
@@ -1925,23 +2027,40 @@ function registryRowMeta(object: AnyObject): {
 // from the same UnitSubtype enum so they stay in lockstep.
 function unitTypeIcon(subtype: Unit['_subtype']): LucideIcon {
   switch (subtype) {
-    case 'command_post':       return Crosshair;
-    case 'drone_isr':          return Plane;
-    case 'drone_strike':       return PlaneTakeoff;
-    case 'infantry_team':      return Users;
-    case 'infantry_recon':     return Eye;
-    case 'infantry_kinetic':   return Zap;
-    case 'vehicle_mech':       return Truck;
-    case 'vehicle_recon':      return Eye;
-    case 'vehicle_himars':     return Rocket;
-    case 'vehicle_mortar':     return Rocket;
-    case 'vehicle_medical':    return Heart;
-    case 'vehicle_logistic':   return Truck;
-    case 'drone':              return Plane;
-    case 'vehicle':            return Truck;
-    case 'infantry':           return Users;
-    case 'boat':               return Truck;
-    default:                   return Database;
+    case 'command_post':
+      return Crosshair;
+    case 'drone_isr':
+      return Plane;
+    case 'drone_strike':
+      return PlaneTakeoff;
+    case 'infantry_team':
+      return Users;
+    case 'infantry_recon':
+      return Eye;
+    case 'infantry_kinetic':
+      return Zap;
+    case 'vehicle_mech':
+      return Truck;
+    case 'vehicle_recon':
+      return Eye;
+    case 'vehicle_himars':
+      return Rocket;
+    case 'vehicle_mortar':
+      return Rocket;
+    case 'vehicle_medical':
+      return Heart;
+    case 'vehicle_logistic':
+      return Truck;
+    case 'drone':
+      return Plane;
+    case 'vehicle':
+      return Truck;
+    case 'infantry':
+      return Users;
+    case 'boat':
+      return Truck;
+    default:
+      return Database;
   }
 }
 
@@ -1950,29 +2069,50 @@ function unitTypeIcon(subtype: Unit['_subtype']): LucideIcon {
 // registry stays scannable.
 function eventIcon(sub: Event['_subtype']): LucideIcon {
   // kinetic
-  if (sub === 'artillery_impact' || sub === 'missile_launch' ||
-      sub === 'air_strike' || sub === 'fpv_strike' ||
-      sub === 'loitering_munition_engage' || sub === 'small_arms_contact' ||
-      sub === 'unit_destroyed' || sub === 'unit_damaged') {
+  if (
+    sub === 'artillery_impact' ||
+    sub === 'missile_launch' ||
+    sub === 'air_strike' ||
+    sub === 'fpv_strike' ||
+    sub === 'loitering_munition_engage' ||
+    sub === 'small_arms_contact' ||
+    sub === 'unit_destroyed' ||
+    sub === 'unit_damaged'
+  ) {
     return Zap;
   }
   // ISR
-  if (sub === 'visual_detection' || sub === 'cued_search' ||
-      sub === 'track_acquired' || sub === 'track_lost' ||
-      sub === 'regained_track' || sub === 'classification_upgrade' ||
-      sub === 'thermal_signature' || sub === 'detection') {
+  if (
+    sub === 'visual_detection' ||
+    sub === 'cued_search' ||
+    sub === 'track_acquired' ||
+    sub === 'track_lost' ||
+    sub === 'regained_track' ||
+    sub === 'classification_upgrade' ||
+    sub === 'thermal_signature' ||
+    sub === 'detection'
+  ) {
     return Eye;
   }
   // C2 / comms
   if (sub === 'sigint_intercept' || sub === 'rf_ping') return Satellite;
-  if (sub === 'comms_outage' || sub === 'jam_pulse' ||
-      sub === 'gps_denied_zone' || sub === 'position_report') {
+  if (
+    sub === 'comms_outage' ||
+    sub === 'jam_pulse' ||
+    sub === 'gps_denied_zone' ||
+    sub === 'position_report'
+  ) {
     return Radio;
   }
   // maneuver / smoke
-  if (sub === 'ground_advance' || sub === 'withdrawal' ||
-      sub === 'breach_attempt' || sub === 'defensive_consolidation' ||
-      sub === 'smoke_screen' || sub === 'terrain_obscuration') {
+  if (
+    sub === 'ground_advance' ||
+    sub === 'withdrawal' ||
+    sub === 'breach_attempt' ||
+    sub === 'defensive_consolidation' ||
+    sub === 'smoke_screen' ||
+    sub === 'terrain_obscuration'
+  ) {
     return Truck;
   }
   // logistics / lifecycle
