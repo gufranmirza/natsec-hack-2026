@@ -1,62 +1,262 @@
-import type { Unit } from '@/types/ontology';
+// Auto-generated from sim/scenarios/silent-eye-20260502/silent-eye.events.jsonl
+// Do not edit by hand — re-run sim/.../compile-to-fixtures.mjs
 
+import type { Unit } from '@/types/ontology';
 export const UNITS: Unit[] = [
   {
-    _type: 'Unit',
-    _id: 'unit_rook1',
-    _version: 12,
-    _observed_at: '2026-05-02T14:23:40Z',
-    _ingested_at: '2026-05-02T14:23:40Z',
-    _source: 'mavlink',
-    _source_ref: 'rook-1',
-    _subtype: 'drone',
-    callsign: 'ROOK-1',
-    position: [48.72, 37.62],
-    altitude_m: 980,
-    heading_deg: 88,
-    speed_mps: 52,
-    status: 'on_station',
-    health: 'healthy',
-    battery_pct: 76,
-    fuel_pct: 71,
-    capabilities: ['optical', 'ir', 'sigint'],
-    assigned_mission_id: 'miss_recon_north',
+    _type: "Unit",
+    _id: "unit_blue_cp",
+    _source: "sim:silent-eye-20260502",
+    _source_ref: "unit_blue_cp",
+    _observed_at: "2026-05-02T06:25:00.000Z",
+    _subtype: "command_post",
+    callsign: "ALPHA-6",
+    position: [
+      48.62,
+      37.74
+    ],
+    status: "on_station",
+    health: "healthy",
+    capabilities: [
+      "optical",
+      "sigint"
+    ],
+    assigned_mission_id: "obj_silent_eye",
+    _version: 1,
+    _ingested_at: "2026-05-02T06:25:00.000Z"
   },
   {
-    _type: 'Unit',
-    _id: 'unit_rook2',
-    _version: 9,
-    _observed_at: '2026-05-02T14:23:40Z',
-    _ingested_at: '2026-05-02T14:23:40Z',
-    _source: 'mavlink',
-    _source_ref: 'rook-2',
-    _subtype: 'drone',
-    callsign: 'ROOK-2',
-    position: [48.57, 37.76],
-    altitude_m: 1100,
-    heading_deg: 215,
-    speed_mps: 45,
-    status: 'returning',
-    health: 'limited',
-    battery_pct: 42,
-    fuel_pct: 84,
-    capabilities: ['optical', 'eo'],
-  },
-  {
-    _type: 'Unit',
-    _id: 'unit_bravo3',
-    _version: 4,
-    _observed_at: '2026-05-02T14:22:11Z',
-    _ingested_at: '2026-05-02T14:22:11Z',
-    _source: 'manual',
-    _source_ref: 'bravo-3',
-    _subtype: 'infantry',
-    callsign: 'BRAVO-3',
-    position: [48.67, 37.35],
+    _type: "Unit",
+    _id: "unit_blue_mech_pl1",
+    _source: "sim:silent-eye-20260502",
+    _source_ref: "unit_blue_mech_pl1",
+    _observed_at: "2026-05-02T06:25:00.000Z",
+    _subtype: "vehicle",
+    callsign: "PUNISHER-1",
+    position: [
+      48.6,
+      37.8
+    ],
     heading_deg: 90,
-    speed_mps: 1.2,
-    status: 'on_station',
-    health: 'healthy',
-    capabilities: ['optical'],
+    speed_mps: 0,
+    status: "on_station",
+    health: "healthy",
+    fuel_pct: 71,
+    capabilities: [
+      "optical",
+      "ir"
+    ],
+    assigned_mission_id: "obj_silent_eye",
+    _version: 1,
+    _ingested_at: "2026-05-02T06:25:00.000Z"
   },
+  {
+    _type: "Unit",
+    _id: "unit_blue_recon_team1",
+    _source: "sim:silent-eye-20260502",
+    _source_ref: "unit_blue_recon_team1",
+    _observed_at: "2026-05-02T06:25:00.000Z",
+    _subtype: "vehicle",
+    callsign: "SCOUT-1",
+    position: [
+      48.58,
+      37.86
+    ],
+    heading_deg: 110,
+    speed_mps: 0,
+    status: "on_station",
+    health: "healthy",
+    fuel_pct: 88,
+    capabilities: [
+      "optical"
+    ],
+    assigned_mission_id: "obj_silent_eye",
+    _version: 1,
+    _ingested_at: "2026-05-02T06:25:00.000Z"
+  },
+  {
+    _type: "Unit",
+    _id: "unit_blue_recon_team2",
+    _source: "sim:silent-eye-20260502",
+    _source_ref: "unit_blue_recon_team2",
+    _observed_at: "2026-05-02T06:25:00.000Z",
+    _subtype: "infantry",
+    callsign: "SCOUT-2",
+    position: [
+      48.57,
+      37.88
+    ],
+    status: "on_station",
+    health: "healthy",
+    capabilities: [
+      "optical"
+    ],
+    assigned_mission_id: "obj_silent_eye",
+    _version: 1,
+    _ingested_at: "2026-05-02T06:25:00.000Z"
+  },
+  {
+    _type: "Unit",
+    _id: "unit_rook1",
+    _source: "sim:silent-eye-20260502",
+    _source_ref: "unit_rook1",
+    _observed_at: "2026-05-02T06:25:00.000Z",
+    _subtype: "drone",
+    callsign: "ROOK-1",
+    position: [
+      48.65,
+      37.78
+    ],
+    altitude_m: 680,
+    heading_deg: 120,
+    speed_mps: 18,
+    status: "on_station",
+    health: "healthy",
+    battery_pct: 76,
+    capabilities: [
+      "optical",
+      "ir",
+      "sigint"
+    ],
+    assigned_mission_id: "obj_silent_eye",
+    _version: 1,
+    _ingested_at: "2026-05-02T06:25:00.000Z"
+  },
+  {
+    _type: "Unit",
+    _id: "unit_rook2",
+    _source: "sim:silent-eye-20260502",
+    _source_ref: "unit_rook2",
+    _observed_at: "2026-05-02T06:25:00.000Z",
+    _subtype: "drone",
+    callsign: "ROOK-2",
+    position: [
+      48.55,
+      37.82
+    ],
+    altitude_m: 620,
+    heading_deg: 215,
+    speed_mps: 16,
+    status: "on_station",
+    health: "healthy",
+    battery_pct: 54,
+    capabilities: [
+      "optical",
+      "eo"
+    ],
+    assigned_mission_id: "obj_silent_eye",
+    _version: 1,
+    _ingested_at: "2026-05-02T06:25:00.000Z"
+  },
+  {
+    _type: "Unit",
+    _id: "unit_blue_uas_falcon1",
+    _source: "sim:silent-eye-20260502",
+    _source_ref: "unit_blue_uas_falcon1",
+    _observed_at: "2026-05-02T06:25:00.000Z",
+    _subtype: "drone",
+    callsign: "FALCON-1",
+    position: [
+      48.7,
+      37.7
+    ],
+    altitude_m: 3200,
+    heading_deg: 135,
+    speed_mps: 42,
+    status: "on_station",
+    health: "healthy",
+    battery_pct: 91,
+    fuel_pct: 68,
+    capabilities: [
+      "optical",
+      "ir",
+      "kinetic"
+    ],
+    assigned_mission_id: "obj_silent_eye",
+    _version: 1,
+    _ingested_at: "2026-05-02T06:25:00.000Z"
+  },
+  {
+    _type: "Unit",
+    _id: "unit_blue_fpv_team",
+    _source: "sim:silent-eye-20260502",
+    _source_ref: "unit_blue_fpv_team",
+    _observed_at: "2026-05-02T06:25:00.000Z",
+    _subtype: "infantry",
+    callsign: "HORNET",
+    position: [
+      48.61,
+      37.81
+    ],
+    status: "on_station",
+    health: "healthy",
+    capabilities: [
+      "kinetic"
+    ],
+    assigned_mission_id: "obj_silent_eye",
+    _version: 1,
+    _ingested_at: "2026-05-02T06:25:00.000Z"
+  },
+  {
+    _type: "Unit",
+    _id: "unit_blue_himars_pair",
+    _source: "sim:silent-eye-20260502",
+    _source_ref: "unit_blue_himars_pair",
+    _observed_at: "2026-05-02T06:25:00.000Z",
+    _subtype: "vehicle",
+    callsign: "LIGHTNING",
+    position: [
+      48.6,
+      37.1
+    ],
+    status: "on_station",
+    health: "healthy",
+    fuel_pct: 92,
+    capabilities: [
+      "kinetic"
+    ],
+    _version: 1,
+    _ingested_at: "2026-05-02T06:25:00.000Z"
+  },
+  {
+    _type: "Unit",
+    _id: "unit_blue_medical",
+    _source: "sim:silent-eye-20260502",
+    _source_ref: "unit_blue_medical",
+    _observed_at: "2026-05-02T06:25:00.000Z",
+    _subtype: "vehicle",
+    callsign: "LAZARUS",
+    position: [
+      48.63,
+      37.72
+    ],
+    status: "on_station",
+    health: "healthy",
+    fuel_pct: 85,
+    capabilities: [],
+    _version: 1,
+    _ingested_at: "2026-05-02T06:25:00.000Z"
+  },
+  {
+    _type: "Unit",
+    _id: "unit_bravo3",
+    _source: "sim:silent-eye-20260502",
+    _source_ref: "unit_bravo3",
+    _observed_at: "2026-05-02T06:25:00.000Z",
+    _subtype: "infantry",
+    callsign: "BRAVO-3",
+    position: [
+      48.66,
+      37.36
+    ],
+    heading_deg: 90,
+    speed_mps: 0,
+    status: "on_station",
+    health: "healthy",
+    capabilities: [
+      "optical"
+    ],
+    _version: 1,
+    _ingested_at: "2026-05-02T06:25:00.000Z"
+  }
 ];

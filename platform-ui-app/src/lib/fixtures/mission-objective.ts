@@ -1,23 +1,40 @@
-import type { MissionObjective } from '@/types/ontology';
+// Auto-generated from sim/scenarios/silent-eye-20260502/silent-eye.events.jsonl
+// Do not edit by hand — re-run sim/.../compile-to-fixtures.mjs
 
+import type { MissionObjective } from '@/types/ontology';
 export const MISSION_OBJECTIVE: MissionObjective = {
-  _type: 'MissionObjective',
-  _id: 'obj_silent_eye',
-  _version: 1,
-  _observed_at: '2026-05-02T12:09:38Z',
-  _ingested_at: '2026-05-02T12:09:38Z',
-  _source: 'operator',
-  _source_ref: 'OP-SE-001',
-  title: 'OP SILENT EYE',
-  description:
-    'Maintain persistent ISR over the eastern Ukraine line of contact using DeepState terrain context, drone telemetry, RF cues, and commander-approved tasking. Visual confirmation on any contact entering the inner ring; no engagement without explicit operator authorization.',
-  priority: 'P1',
+  _type: "MissionObjective",
+  _id: "obj_silent_eye",
+  _source: "sim:silent-eye-20260502",
+  _source_ref: "obj_silent_eye",
+  _observed_at: "2026-05-02T06:25:00.000Z",
+  title: "OP SILENT EYE",
+  description: "Deny RED breakthrough in Chasiv Yar / Bakhmut axis AO. Maintain persistent ISR coverage, counter-fire RED indirect fires, protect UA mech infantry prepared positions. Repel any deliberate attack with light losses; preserve combat power for sustained defense.",
+  priority: "P1",
   target_area: [
-    [49.05, 37.15],
-    [49.05, 38.2],
-    [48.35, 38.2],
-    [48.35, 37.15],
+    [
+      48.4,
+      37.2
+    ],
+    [
+      48.4,
+      38.05
+    ],
+    [
+      48.85,
+      38.05
+    ],
+    [
+      48.85,
+      37.2
+    ],
+    [
+      48.4,
+      37.2
+    ]
   ],
-  deadline: '2026-05-02T18:00:00Z',
-  status: 'active',
+  deadline: "2026-05-02T18:00:00.000Z",
+  status: "active",
+  _version: 1,
+  _ingested_at: "2026-05-02T06:25:00.000Z"
 };
