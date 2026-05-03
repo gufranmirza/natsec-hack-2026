@@ -39,6 +39,13 @@ interface ColMapProps {
   units: Unit[];
   selectedId?: string;
   onSelect: (o: AnyObject) => void;
+  /**
+   * When set, the map auto-centers on this unit's position on every
+   * position update. Used by the UAS tab's Map view to follow the
+   * dispatched drone. Manual drag is disabled while follow is active
+   * (any drag would just snap back on the next position tick).
+   */
+  followUnitId?: string;
 }
 
 type Tile = {
@@ -155,12 +162,45 @@ const ORIENTABLE_ICONS = new Set<LucideIcon>([
   Rocket,
 ]);
 
-export function ColMap({ entities, units, selectedId, onSelect }: ColMapProps) {
+export function ColMap({
+  entities,
+  units,
+  selectedId,
+  onSelect,
+  followUnitId,
+}: ColMapProps) {
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
   const [povOpen, setPovOpen] = useState(false);
   const dragRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+  const sectionRef = useRef<HTMLElement>(null);
+
+  // Follow-pan: when followUnitId is set, recompute pan on every
+  // position update so the unit stays at section center. Manual drag
+  // is disabled in this mode (any drag would snap back on the next
+  // tick anyway).
+  const followUnit = useMemo(
+    () =>
+      followUnitId ? units.find((u) => u._id === followUnitId) : undefined,
+    [followUnitId, units]
+  );
+  useEffect(() => {
+    if (!followUnit) return;
+    const el = sectionRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    const projected = projectToSvg(followUnit.position);
+    const scale = Math.max(
+      1.08,
+      1.08 * ZOOM_SCALE_BASE ** (zoom - DEFAULT_ZOOM)
+    );
+    setPan({
+      x: scale * rect.width * (0.5 - projected.x / MAP_VIEWBOX.w),
+      y: scale * rect.height * (0.5 - projected.y / MAP_VIEWBOX.h),
+    });
+  }, [followUnit?.position, zoom, followUnit]);
 
   const selectedDrone = useMemo(() => {
     if (!selectedId) return null;
@@ -228,6 +268,7 @@ export function ColMap({ entities, units, selectedId, onSelect }: ColMapProps) {
   }, [dragging]);
 
   const handlePointerDown = (event: React.PointerEvent<HTMLElement>) => {
+    if (followUnit) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     if ((event.target as HTMLElement).closest('button, a, input')) return;
     dragRef.current = {
@@ -241,9 +282,14 @@ export function ColMap({ entities, units, selectedId, onSelect }: ColMapProps) {
 
   return (
     <section
+      ref={sectionRef}
       className={[
         'relative h-full touch-none overflow-hidden bg-[hsl(220_12%_84%)] select-none',
-        dragging ? 'cursor-grabbing' : 'cursor-grab',
+        followUnit
+          ? 'cursor-default'
+          : dragging
+            ? 'cursor-grabbing'
+            : 'cursor-grab',
       ].join(' ')}
       onPointerDown={handlePointerDown}
     >

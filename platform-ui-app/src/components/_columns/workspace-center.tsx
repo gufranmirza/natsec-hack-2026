@@ -15,6 +15,7 @@ import {
   Heart,
   Lightbulb,
   type LucideIcon,
+  MapPinned,
   Mic,
   Plane,
   PlaneTakeoff,
@@ -160,8 +161,11 @@ export function WorkspaceCenter({
   if (workspace === 'drone_ops') {
     return (
       <DroneLiveSurface
+        entities={entities}
         units={units}
         activeDroneFeed={activeDroneFeed}
+        selectedId={selectedId}
+        onSelect={onSelect}
         onLaunchDrone={onLaunchDrone}
         onLaunchSwarm={onLaunchSwarm}
       />
@@ -384,13 +388,19 @@ function isStateChangeEvent(event: Event): boolean {
 }
 
 function DroneLiveSurface({
+  entities,
   units,
   activeDroneFeed,
+  selectedId: externalSelectedId,
+  onSelect,
   onLaunchDrone,
   onLaunchSwarm,
 }: {
+  entities: Entity[];
   units: Unit[];
   activeDroneFeed?: string;
+  selectedId?: string;
+  onSelect: (o: AnyObject) => void;
   onLaunchDrone: (unitId: string) => void;
   onLaunchSwarm: () => void;
 }) {
@@ -405,6 +415,7 @@ function DroneLiveSurface({
       ? activeDroneFeed
       : (cameraDrones[0]?._id ?? null);
   const [selectedId, setSelectedId] = useState<string | null>(seedId);
+  const [view, setView] = useState<'camera' | 'map'>('camera');
 
   // Sync local selection with parent when the upstream activeDroneFeed
   // changes (e.g., operator clicked a drone marker on the map).
@@ -436,13 +447,55 @@ function DroneLiveSurface({
       />
       <div className="bg-border grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_320px] gap-px">
         <div className="bg-[hsl(220_25%_8%)] flex min-h-0 flex-col overflow-hidden">
-          {drone && hasCameraCapability(drone) ? (
-            <DroneCameraView unit={drone} className="min-h-0 flex-1" />
+          <div className="border-border bg-background flex shrink-0 items-stretch border-b">
+            <button
+              type="button"
+              onClick={() => setView('camera')}
+              className={[
+                'flex flex-1 items-center justify-center gap-1.5 px-3 py-2 font-mono text-[11px] font-bold transition-colors',
+                view === 'camera'
+                  ? 'bg-foreground text-background'
+                  : 'text-muted-foreground hover:bg-secondary',
+              ].join(' ')}
+              aria-pressed={view === 'camera'}
+            >
+              <Camera className="size-3.5" />
+              Live camera
+            </button>
+            <button
+              type="button"
+              onClick={() => setView('map')}
+              className={[
+                'border-border flex flex-1 items-center justify-center gap-1.5 border-l px-3 py-2 font-mono text-[11px] font-bold transition-colors',
+                view === 'map'
+                  ? 'bg-foreground text-background'
+                  : 'text-muted-foreground hover:bg-secondary',
+              ].join(' ')}
+              aria-pressed={view === 'map'}
+            >
+              <MapPinned className="size-3.5" />
+              Drones map
+            </button>
+          </div>
+          {view === 'camera' ? (
+            drone && hasCameraCapability(drone) ? (
+              <DroneCameraView unit={drone} className="min-h-0 flex-1" />
+            ) : (
+              <div className="text-muted-foreground flex flex-1 items-center justify-center font-mono text-[12px]">
+                {drones.length === 0
+                  ? 'No drones online — fleet roster is empty.'
+                  : 'Selected drone has no camera payload.'}
+              </div>
+            )
           ) : (
-            <div className="text-muted-foreground flex flex-1 items-center justify-center font-mono text-[12px]">
-              {drones.length === 0
-                ? 'No drones online — fleet roster is empty.'
-                : 'Selected drone has no camera payload.'}
+            <div className="min-h-0 flex-1">
+              <ColMap
+                entities={entities}
+                units={units}
+                selectedId={externalSelectedId}
+                onSelect={onSelect}
+                followUnitId={drone?._id}
+              />
             </div>
           )}
           <div className="border-border bg-background grid grid-cols-2 gap-px border-t md:grid-cols-4">
