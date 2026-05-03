@@ -57,8 +57,17 @@ def rule_1_evidence_refs_chronological(rows: list[dict]) -> list[Violation]:
 
 
 def rule_2_entity_id_spawned_first(rows: list[dict]) -> list[Violation]:
-    """Every entity_id referenced must be spawned by an Entity record at an earlier _observed_at."""
-    spawn_at = {r["_id"]: r["_observed_at"] for r in rows if r["_type"] == "Entity"}
+    """Every entity_id referenced must be spawned by an Entity record at an earlier _observed_at.
+    An entity may be re-emitted (movement / reclassification); spawn = the earliest observation."""
+    spawn_at: dict[str, str] = {}
+    for r in rows:
+        if r["_type"] != "Entity":
+            continue
+        eid = r["_id"]
+        ts = r["_observed_at"]
+        if eid not in spawn_at or ts < spawn_at[eid]:
+            spawn_at[eid] = ts
+
     out: list[Violation] = []
     for r in rows:
         eid = r.get("entity_id")
