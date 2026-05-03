@@ -14,16 +14,8 @@ export async function apiClient<T>(
   options: RequestInit = {},
   token?: string
 ): Promise<T> {
-  const isServer = typeof window === 'undefined';
-  let fullUrl = url;
-  if (isServer) {
-    fullUrl = `${process.env.PLATFORM_API_URL}${url}`;
-  } else if (process.env.NEXT_PUBLIC_PLATFORM_API_URL) {
-    // Browser-side calls go directly to the CP read API. Without this
-    // the URL stays relative and Next.js will look for /api/v1/... on
-    // its own dev server, where the route doesn't exist.
-    fullUrl = `${process.env.NEXT_PUBLIC_PLATFORM_API_URL}${url}`;
-  }
+  const base = process.env.NEXT_PUBLIC_PLATFORM_API_URL ?? '';
+  const fullUrl = base ? `${base}${url}` : url;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',

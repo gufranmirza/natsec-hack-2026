@@ -4,7 +4,7 @@ export async function serverApiClient<T>(
   url: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const fullUrl = `${process.env.PLATFORM_API_URL}${url}`;
+  const fullUrl = `${process.env.NEXT_PUBLIC_PLATFORM_API_URL}${url}`;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
