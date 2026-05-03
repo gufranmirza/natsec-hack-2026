@@ -3,13 +3,21 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import deepStateOccupied from '@/lib/fixtures/deepstate-occupied-20260502.json';
-import type { AnyObject, Entity, Event, LatLon, Unit } from '@/types/ontology';
+import type {
+  AnyObject,
+  Entity,
+  Event,
+  LatLon,
+  Recommendation,
+  Unit,
+} from '@/types/ontology';
 import { MAP_VIEWBOX } from '@/types/ontology';
 
 interface ColMapProps {
   entities: Entity[];
   units: Unit[];
   events: Event[];
+  recommendations: Recommendation[];
   selectedId?: string;
   onSelect: (o: AnyObject) => void;
 }
@@ -97,6 +105,7 @@ export function ColMap({
   entities,
   units,
   events,
+  recommendations,
   selectedId,
   onSelect,
 }: ColMapProps) {
@@ -186,6 +195,14 @@ export function ColMap({
           <LayerRow label="RF search area" tone="warning" />
         </div>
       </div>
+
+      <AlertsPriorityPanel
+        entities={entities}
+        units={units}
+        events={events}
+        recommendations={recommendations}
+        onSelect={onSelect}
+      />
 
       <div className="border-border bg-card/95 absolute bottom-3 left-3 z-30 max-w-[275px] border px-3 py-2 backdrop-blur">
         <div className="label-cap-sm text-muted-foreground">Dataset</div>
@@ -477,6 +494,157 @@ function MissionMarkers({
       ))}
     </div>
   );
+}
+
+function AlertsPriorityPanel({
+  entities,
+  units,
+  events,
+  recommendations,
+  onSelect,
+}: {
+  entities: Entity[];
+  units: Unit[];
+  events: Event[];
+  recommendations: Recommendation[];
+  onSelect: (o: AnyObject) => void;
+}) {
+  const criticalEvents = events.filter(
+    (event) => event.severity === 'critical'
+  );
+  const warningEvents = events.filter((event) => event.severity === 'warn');
+  const pendingRecommendations = recommendations.filter(
+    (recommendation) => recommendation.status === 'pending'
+  );
+  const lowBattery = units.filter(
+    (unit) => unit._subtype === 'drone' && (unit.battery_pct ?? 100) < 45
+  );
+  const highThreat = entities.filter(
+    (entity) =>
+      entity.affiliation === 'hostile' || entity.threat_level === 'high'
+  );
+  const priorityRows = [
+    ...criticalEvents.slice(0, 2).map((event) => ({
+      key: event._id,
+      tone: 'critical' as const,
+      label: event.verb ?? event._subtype,
+      body: event.description,
+      meta: _time(event._observed_at),
+      object: event as AnyObject,
+    })),
+    ...pendingRecommendations.slice(0, 2).map((recommendation) => ({
+      key: recommendation._id,
+      tone: 'decision' as const,
+      label: `${recommendation.verb} ${recommendation.asset_callsign ?? 'asset'}`,
+      body: recommendation.short,
+      meta: `${Math.round(recommendation.confidence * 100)}% · approval`,
+      object: recommendation as AnyObject,
+    })),
+    ...warningEvents.slice(0, 2).map((event) => ({
+      key: event._id,
+      tone: 'warning' as const,
+      label: event.verb ?? event._subtype,
+      body: event.description,
+      meta: _time(event._observed_at),
+      object: event as AnyObject,
+    })),
+  ].slice(0, 4);
+
+  return (
+    <div className="border-border bg-card/95 absolute left-[280px] right-[260px] top-3 z-30 hidden border backdrop-blur xl:block">
+      <div className="border-border flex items-center justify-between gap-4 border-b px-3 py-2">
+        <div>
+          <div className="label-cap-sm text-muted-foreground">
+            Alerts & priorities
+          </div>
+          <div className="text-foreground font-mono text-[11px] font-bold">
+            Commander attention queue
+          </div>
+        </div>
+        <div className="border-border bg-border grid min-w-[360px] grid-cols-4 gap-px overflow-hidden border">
+          <PriorityMetric
+            label="Critical"
+            value={criticalEvents.length}
+            tone="critical"
+          />
+          <PriorityMetric
+            label="Decisions"
+            value={pendingRecommendations.length}
+            tone="decision"
+          />
+          <PriorityMetric
+            label="Battery"
+            value={lowBattery.length}
+            tone="warning"
+          />
+          <PriorityMetric
+            label="Threats"
+            value={highThreat.length}
+            tone="critical"
+          />
+        </div>
+      </div>
+      <div className="divide-border grid grid-cols-4 divide-x">
+        {priorityRows.map((row) => (
+          <button
+            key={row.key}
+            type="button"
+            onClick={() => onSelect(row.object)}
+            className="hover:bg-secondary min-w-0 px-3 py-2 text-left"
+          >
+            <div className="mb-1 flex items-center gap-2">
+              <span className={`size-1.5 shrink-0 ${priorityDot(row.tone)}`} />
+              <span className="text-foreground truncate font-mono text-[10px] font-bold">
+                {row.label}
+              </span>
+              <span className="text-muted-foreground ml-auto font-mono text-[9px]">
+                {row.meta}
+              </span>
+            </div>
+            <p className="text-muted-foreground line-clamp-2 text-[10px] leading-snug">
+              {row.body}
+            </p>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PriorityMetric({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: 'critical' | 'decision' | 'warning';
+}) {
+  return (
+    <div className="bg-card px-2 py-1.5">
+      <div className="text-muted-foreground font-mono text-[8px] uppercase">
+        {label}
+      </div>
+      <div
+        className={[
+          'mt-0.5 font-mono text-[14px] font-bold',
+          tone === 'critical'
+            ? 'text-threat'
+            : tone === 'decision'
+              ? 'text-primary'
+              : 'text-warning',
+        ].join(' ')}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function priorityDot(tone: 'critical' | 'decision' | 'warning') {
+  if (tone === 'critical') return 'bg-threat';
+  if (tone === 'decision') return 'bg-primary';
+  return 'bg-warning';
 }
 
 function RealTimeMapFeed({

@@ -175,6 +175,7 @@ export function WorkspaceCenter({
       entities={entities}
       units={units}
       events={events}
+      recommendations={recommendations}
       selectedId={selectedId}
       onSelect={onSelect}
     />
