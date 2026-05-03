@@ -87,6 +87,7 @@ interface WorkspaceCenterProps {
   reports: Report[];
   recommendations: Recommendation[];
   aiAnswer?: MissionAnswer;
+  aiAnswerHistory?: MissionAnswer[];
   selectedId?: string;
   activeFeedSource: DataSourceId;
   activeDroneFeed?: string;
@@ -121,6 +122,7 @@ export function WorkspaceCenter({
   reports,
   recommendations,
   aiAnswer,
+  aiAnswerHistory,
   selectedId,
   activeFeedSource,
   activeDroneFeed,
@@ -201,7 +203,7 @@ export function WorkspaceCenter({
         reports={reports}
         events={events}
         recommendations={recommendations}
-        aiAnswer={aiAnswer}
+        aiAnswerHistory={aiAnswerHistory}
         isAskingAi={isAskingAi}
         onAsk={onAsk}
         onVoiceCommand={onVoiceCommand}
@@ -623,15 +625,7 @@ function OntologySurface({
           })}
         </div>
         <div className="bg-background min-h-0 overflow-y-auto p-5">
-          <div className="grid grid-cols-3 gap-3">
-            <OntologyMetric label="Entities" value={entities.length} />
-            <OntologyMetric label="Units" value={units.length} />
-            <OntologyMetric
-              label="Evidence"
-              value={reports.length + events.length}
-            />
-          </div>
-          <div className="border-border bg-card mt-3 grid grid-cols-3 gap-px border">
+          <div className="border-border bg-card grid grid-cols-3 gap-px border">
             <button
               type="button"
               onClick={onAddObject}
@@ -943,7 +937,7 @@ function IntelligenceSurface({
   reports,
   events,
   recommendations,
-  aiAnswer,
+  aiAnswerHistory,
   isAskingAi,
   onAsk,
   onVoiceCommand,
@@ -956,7 +950,7 @@ function IntelligenceSurface({
   reports: Report[];
   events: Event[];
   recommendations: Recommendation[];
-  aiAnswer?: MissionAnswer;
+  aiAnswerHistory?: MissionAnswer[];
   isAskingAi?: boolean;
   onAsk: (query: string, fromVoice?: boolean) => void;
   onVoiceCommand?: () => void;
@@ -964,6 +958,7 @@ function IntelligenceSurface({
   voiceArmed?: boolean;
   voiceTranscript?: string;
 }) {
+  const history = aiAnswerHistory ?? [];
   const corpus =
     entities.length +
     units.length +
@@ -1054,11 +1049,63 @@ function IntelligenceSurface({
                 <Send className="size-3.5" />
               </Button>
             </form>
+
+            {/* GROUNDED PROMPTS — sit inside the hero, below the input.
+                Default expanded; operator can collapse with the chevron.
+                text-left wrapper escapes the hero's text-center alignment. */}
+            <div className="mt-6 w-full max-w-3xl text-left">
+              <button
+                type="button"
+                onClick={() => setShowPrompts((v) => !v)}
+                aria-expanded={showPrompts}
+                className="border-border bg-muted/30 hover:bg-muted/60 flex w-full items-center justify-between border px-3 py-2 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <ChevronDown
+                    className={[
+                      'text-muted-foreground/70 size-3 transition-transform',
+                      showPrompts ? '' : '-rotate-90',
+                    ].join(' ')}
+                    aria-hidden
+                  />
+                  <Search className="text-primary size-3.5" />
+                  <span className="text-foreground font-mono text-[12px] font-bold">
+                    Grounded prompts
+                  </span>
+                </div>
+                <span className="text-muted-foreground font-mono text-[10px]">
+                  {suggestions.length} · derived from {corpus} objects
+                </span>
+              </button>
+              {showPrompts ? (
+                <div className="border-border grid gap-2 border border-t-0 p-3">
+                  {suggestions.length === 0 ? (
+                    <span className="text-muted-foreground/70 px-1 font-mono text-[10px]">
+                      No grounded prompts — load mission state.
+                    </span>
+                  ) : (
+                    suggestions.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => onAsk(s.prompt)}
+                        className="border-border bg-card hover:bg-secondary text-foreground flex items-baseline gap-3 border px-3 py-2 text-left text-[12px] leading-snug"
+                      >
+                        <span className="text-muted-foreground/80 w-14 shrink-0 font-mono text-[9px] uppercase">
+                          {s.category}
+                        </span>
+                        <span className="min-w-0 flex-1">{s.prompt}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              ) : null}
+            </div>
           </div>
 
-          {/* THINKING — render while a query is in flight. Shows the
-              operator's question immediately so the surface is reactive
-              even before the model starts streaming. */}
+          {/* THINKING — render while a query is in flight. Sits above the
+              previous answer (which stays mounted) so the operator can
+              still read prior context until the new response arrives. */}
           {isAskingAi ? (
             <div className="border-warning/50 bg-warning/5 border p-4">
               <div className="mb-2 flex items-baseline justify-between gap-3">
@@ -1089,85 +1136,45 @@ function IntelligenceSurface({
             </div>
           ) : null}
 
-          {/* ANSWER — only when present and not currently re-thinking */}
-          {aiAnswer && !isAskingAi ? (
-            <div className="border-primary/50 bg-primary/5 border p-4">
+          {/* ANSWER HISTORY — newest at top, every prior Q&A stays mounted.
+              Latest entry uses the primary tone; older entries fade slightly
+              so the eye lands on the freshest reply. */}
+          {history.map((entry, idx) => (
+            <div
+              key={`${entry.generatedAt}-${idx}`}
+              className={[
+                'border p-4',
+                idx === 0
+                  ? 'border-primary/50 bg-primary/5'
+                  : 'border-border bg-background opacity-90',
+              ].join(' ')}
+            >
               <div className="mb-2 flex items-baseline justify-between gap-3">
                 <h2 className="text-foreground font-mono text-[13px] font-bold">
-                  Mission answer
+                  {idx === 0 ? 'Mission answer' : 'Earlier answer'}
                 </h2>
                 <span className="text-muted-foreground font-mono text-[9px]">
-                  {_time(aiAnswer.generatedAt)} ·{' '}
-                  {aiAnswer.fromVoice ? 'voice' : 'typed'}
+                  {_time(entry.generatedAt)} ·{' '}
+                  {entry.fromVoice ? 'voice' : 'typed'}
                 </span>
               </div>
-              {aiAnswer.query ? (
+              {entry.query ? (
                 <div className="border-border bg-card text-foreground/80 mb-3 border-l-2 px-3 py-1.5 text-[12px] italic leading-snug">
-                  {aiAnswer.query}
+                  {entry.query}
                 </div>
               ) : null}
               <MarkdownAnswer
-                text={aiAnswer.response}
+                text={entry.response}
                 className="text-foreground/90 space-y-2 text-[13px]"
               />
-              {aiAnswer.sources.length > 0 || aiAnswer.actions.length > 0 ? (
+              {entry.sources.length > 0 || entry.actions.length > 0 ? (
                 <div className="mt-3 grid grid-cols-2 gap-3">
-                  <AnswerList title="Sources" items={aiAnswer.sources} />
-                  <AnswerList title="Actions" items={aiAnswer.actions} />
+                  <AnswerList title="Sources" items={entry.sources} />
+                  <AnswerList title="Actions" items={entry.actions} />
                 </div>
               ) : null}
             </div>
-          ) : null}
-
-          {/* GROUNDED PROMPTS — collapsible; default open if no answer */}
-          <div className="border-border bg-background border">
-            <button
-              type="button"
-              onClick={() => setShowPrompts((v) => !v)}
-              aria-expanded={showPrompts}
-              className="border-border bg-muted/30 hover:bg-muted/60 flex w-full items-center justify-between border-b px-3 py-2 transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <ChevronDown
-                  className={[
-                    'text-muted-foreground/70 size-3 transition-transform',
-                    showPrompts ? '' : '-rotate-90',
-                  ].join(' ')}
-                  aria-hidden
-                />
-                <Search className="text-primary size-3.5" />
-                <span className="text-foreground font-mono text-[12px] font-bold">
-                  Grounded prompts
-                </span>
-              </div>
-              <span className="text-muted-foreground font-mono text-[10px]">
-                {suggestions.length} · derived from {corpus} objects
-              </span>
-            </button>
-            {showPrompts ? (
-              <div className="grid gap-2 p-3">
-                {suggestions.length === 0 ? (
-                  <span className="text-muted-foreground/70 px-1 font-mono text-[10px]">
-                    No grounded prompts — load mission state.
-                  </span>
-                ) : (
-                  suggestions.map((s) => (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => onAsk(s.prompt)}
-                      className="border-border bg-card hover:bg-secondary text-foreground flex items-baseline gap-3 border px-3 py-2 text-left text-[12px] leading-snug"
-                    >
-                      <span className="text-muted-foreground/80 w-14 shrink-0 font-mono text-[9px] uppercase">
-                        {s.category}
-                      </span>
-                      <span className="min-w-0 flex-1">{s.prompt}</span>
-                    </button>
-                  ))
-                )}
-              </div>
-            ) : null}
-          </div>
+          ))}
         </div>
       </div>
     </section>
@@ -1400,17 +1407,6 @@ function FlightDataRow({ label, value }: { label: string; value: string }) {
     <div className="border-border bg-card grid grid-cols-[94px_1fr] gap-2 border px-3 py-2 font-mono text-[10px]">
       <span className="text-muted-foreground uppercase">{label}</span>
       <span className="text-foreground text-right font-bold">{value}</span>
-    </div>
-  );
-}
-
-function OntologyMetric({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="border-border bg-card border px-3 py-2">
-      <div className="label-cap-sm text-muted-foreground">{label}</div>
-      <div className="text-foreground mt-1 font-mono text-[22px] font-bold">
-        {value}
-      </div>
     </div>
   );
 }
