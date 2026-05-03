@@ -1,0 +1,19 @@
+{
+  "_source": "wikipedia.btr-82",
+  "_source_ref": "https://en.wikipedia.org/wiki/BTR-82",
+  "fetched_at": "2026-05-03",
+  "variant": "BTR-82A",
+  "weight_t": 13.6,
+  "main_armament": "2A72 30mm gun",
+  "secondary_armament": "7.62mm coaxial",
+  "engine_hp": 300,
+  "road_speed_kmh": 80,
+  "range_km": 600,
+  "crew": 3,
+  "passengers": 7,
+  "operator": "Russia",
+  "in_service_since": "2013",
+  "signature_visual": "Wheeled APC, BPPU turret with 30mm cannon",
+  "signature_ir": "TKN-4GA-02 night vision device, medium-hot engine signature",
+  "signature_rf": "R-168 radio family"
+}

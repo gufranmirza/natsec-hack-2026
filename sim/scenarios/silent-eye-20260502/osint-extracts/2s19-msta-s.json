@@ -1,0 +1,16 @@
+{
+  "_source": "wikipedia.2s19-msta",
+  "_source_ref": "https://en.wikipedia.org/wiki/2S19_Msta",
+  "fetched_at": "2026-05-03",
+  "variant": "2S19 Msta-S",
+  "caliber_mm": 152.4,
+  "max_range_km_standard": 24.7,
+  "max_range_km_rocket_assisted": 36,
+  "rate_of_fire_rpm": "6-8 (2S19); 10 (2S19M2)",
+  "weight_t": 42,
+  "road_speed_kmh": 60,
+  "crew": 5,
+  "operators": ["Russia", "Ukraine", "Azerbaijan", "Ethiopia", "Georgia", "Venezuela"],
+  "signature_visual": "Tracked SPH with turret-mounted gun, T-80/T-72-derived running gear",
+  "notes": "Common Russian division-level fires asset. Earlier OP SILENT EYE drafts erroneously listed 'Tornado-S' (an MLRS, not SPH); corrected to Msta-S."
+}

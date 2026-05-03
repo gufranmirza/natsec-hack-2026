@@ -1,0 +1,17 @@
+{
+  "_source": "wikipedia.t-72",
+  "_source_ref": "https://en.wikipedia.org/wiki/T-72",
+  "fetched_at": "2026-05-03",
+  "variant": "T-72B3 (mod. 2011)",
+  "weight_t": 44.5,
+  "main_gun": "125mm 2A46M",
+  "fire_control": "Sosna-U multichannel gunner's sight, digital VHF radio",
+  "armor": "Kontakt-5 explosive reactive armour",
+  "guided_missile_system": "9K119 Refleks",
+  "engine": "V-92S2",
+  "road_speed_kmh": 60,
+  "range_km": "650-700 (with fuel drums)",
+  "crew": 3,
+  "operator": "Russia (and many former-Soviet states)",
+  "notes": "Most-deployed RU MBT in 2022-2026 Ukraine war. Cope cages over turret/engine deck became standard in 2023+ as anti-FPV countermeasure."
+}

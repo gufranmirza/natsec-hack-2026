@@ -1,0 +1,12 @@
+{
+  "_source": "wikipedia.klishchiivka",
+  "_source_ref": "https://en.wikipedia.org/wiki/Klishchiivka",
+  "fetched_at": "2026-05-03",
+  "coords_lat": 48.528056,
+  "coords_lon": 37.958333,
+  "oblast": "Donetsk Oblast",
+  "raion": "Bakhmut Raion",
+  "distance_to_bakhmut_km": 7.91,
+  "contested_history_summary": "Heavy fighting since 29 November 2022. Captured by RU forces 19 January 2023, recaptured by UA forces 23 July 2023, recaptured by RU forces by 17 June 2024.",
+  "notes": "Inside OP SILENT EYE AO bounding box. Suitable as a named map label for col-map ENGLISH_LABELS expansion."
+}

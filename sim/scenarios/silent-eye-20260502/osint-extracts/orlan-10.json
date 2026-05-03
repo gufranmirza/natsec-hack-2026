@@ -1,0 +1,25 @@
+{
+  "_source": "wikipedia.orlan-10",
+  "_source_ref": "https://en.wikipedia.org/wiki/Orlan-10",
+  "fetched_at": "2026-05-03",
+  "class": "Small tactical reconnaissance UAV",
+  "manufacturer": "Special Technology Center (STC), Saint Petersburg",
+  "role": "ISR / reconnaissance unmanned aerial vehicle",
+  "max_speed_kmh": 150,
+  "endurance_h": 16,
+  "range_km": 110,
+  "ceiling_m": 5000,
+  "mass_kg": 15,
+  "payload_kg": 6,
+  "payload_types": [
+    "Canon EOS 750D/800D digital SLR camera",
+    "Lynred PICO640gen2 thermal imaging",
+    "FPV camera",
+    "High-explosive fragmentation projectiles (strike variant)"
+  ],
+  "control_link_freq_mhz_standard": "850-930",
+  "control_link_freq_mhz_emerging": "730-760",
+  "control_link_freq_mhz_development": "430-600",
+  "signature_visual": "Twin-tail pusher-prop, composite fuselage reduces radar signature",
+  "operators": ["Russia", "Kazakhstan", "Myanmar", "Syria", "Uzbekistan", "Venezuela"]
+}

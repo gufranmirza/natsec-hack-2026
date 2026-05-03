@@ -1,0 +1,15 @@
+{
+  "_source": "wikipedia.bm-21-grad",
+  "_source_ref": "https://en.wikipedia.org/wiki/BM-21_Grad",
+  "fetched_at": "2026-05-03",
+  "caliber_mm": 122,
+  "tube_count": 40,
+  "max_range_km_standard": 20,
+  "max_range_km_extended": "40+",
+  "salvo_time_s": 20,
+  "weight_t": 13.71,
+  "road_speed_kmh": 75,
+  "crew": 3,
+  "operators": ["Russia", "Ukraine", "Poland", "Romania", "many others"],
+  "notes": "Universal Soviet/Russian area-fires MRL since 1963. All 40 rockets in 20s salvo."
+}

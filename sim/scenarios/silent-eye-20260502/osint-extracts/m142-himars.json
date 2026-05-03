@@ -1,0 +1,15 @@
+{
+  "_source": "wikipedia.m142-himars",
+  "_source_ref": "https://en.wikipedia.org/wiki/M142_HIMARS",
+  "fetched_at": "2026-05-03",
+  "role": "Light multiple rocket launcher",
+  "vehicle_class": "Wheeled tactical vehicle (FMTV M1140 truck frame)",
+  "max_range_km_M30A1": 92,
+  "max_range_km_GMLRS": 92,
+  "payload_per_pod": "6 GMLRS rockets, or 1 ATACMS missile, or 2 PrSM missiles",
+  "weight_t": 16.25,
+  "crew": 3,
+  "operator": "United States Army, Marine Corps, allied nations",
+  "notable_use_in_ukraine": "Deployed June 2022; struck command posts, ammunition depots; ~36 systems in UA service as of 2025 with 4 destroyed",
+  "notes": "M30A1 alternate-warhead is the cluster-effect round used in counter-battery missions; flight time ~95s at max range."
+}

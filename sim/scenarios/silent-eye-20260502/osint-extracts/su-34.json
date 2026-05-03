@@ -1,0 +1,13 @@
+{
+  "_source": "wikipedia.sukhoi-su-34",
+  "_source_ref": "https://en.wikipedia.org/wiki/Sukhoi_Su-34",
+  "fetched_at": "2026-05-03",
+  "role": "Fighter-bomber / strike fighter",
+  "max_speed_kmh": 1900,
+  "combat_range_km": 1100,
+  "max_takeoff_weight_t": 45.1,
+  "hardpoints": 12,
+  "typical_air_to_ground_load_kg": "12000-14000",
+  "operators": ["Russian Aerospace Forces", "Algerian Air Force (deliveries 2025+)"],
+  "umpk_glide_kit_use": "Deployed since 2023; UMPK (Unified Gliding and Correction Module) GPS-guided bomb kits enable standoff strikes from beyond Ukrainian SAM range. CEP typically 100-200m due to cheap navigation."
+}

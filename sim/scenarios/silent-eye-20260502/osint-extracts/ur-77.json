@@ -1,0 +1,15 @@
+{
+  "_source": "wikipedia.ur-77-meteorit",
+  "_source_ref": "https://en.wikipedia.org/wiki/UR-77_Meteorit",
+  "fetched_at": "2026-05-03",
+  "role": "Mine clearing / breach engineer vehicle",
+  "base_chassis": "2S1 Gvozdika tracked variant",
+  "breach_lane_length_m": 90,
+  "breach_lane_width_m": 6,
+  "weight_t": 15.5,
+  "crew": 2,
+  "operators": ["Russia", "Syria", "Ukraine", "Azerbaijan", "Transnistria"],
+  "in_service_since": "1978",
+  "deployment_method": "Rocket-propelled line charge fires across minefield, detonates to disable mines/IEDs along 90×6m corridor",
+  "notes": "Highly visible signature when deploying line charge (rocket plume, secondary detonations). Frequent FPV target in 2024-2026 RU breach attempts."
+}

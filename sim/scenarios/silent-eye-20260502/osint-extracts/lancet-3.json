@@ -1,0 +1,17 @@
+{
+  "_source": "wikipedia.zala-lancet",
+  "_source_ref": "https://en.wikipedia.org/wiki/ZALA_Lancet",
+  "fetched_at": "2026-05-03",
+  "model": "Lancet-3 (Izdeliye-52)",
+  "role": "Loitering munition / reconnaissance and strike",
+  "warhead_kg": 3,
+  "total_mass_kg": 12,
+  "cruise_speed_mps": 22.2,
+  "max_dive_speed_mps": 83.3,
+  "endurance_min": 40,
+  "range_km": 40,
+  "guidance": "Optical-electronic with TV guidance unit",
+  "datalink_freq_mhz": "868-870 + 902-928 (dual channel with reserve)",
+  "operator": "Russian Armed Forces",
+  "notes": "Dominant RU loitering munition since 2023. Hits successful 30-50% under contested EW environment."
+}
