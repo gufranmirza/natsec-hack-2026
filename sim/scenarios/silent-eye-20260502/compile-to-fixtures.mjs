@@ -141,9 +141,9 @@ const active = objectives.find(o => o.status === 'active') ?? objectives[0];
   console.log(`  missions.ts: ${sortedTabs.length} (tabs)`);
 }
 
-// Plan + TaskingOrder live from CP; emit empty arrays so existing
-// index.ts imports continue to typecheck if anything references them.
-emitFixture('Plan',             'PLANS',            'plans.ts');
-emitFixture('TaskingOrder',     'TASKING_ORDERS',   'tasking-orders.ts');
+// Plan + TaskingOrder live from CP — recengine emits Plans on
+// accept; replayer doesn't ingest TaskingOrders at all (those are
+// operator output). Skip emitting empty fixture files for these
+// types — nothing imports them, they were dead weight.
 
 console.log('Done.');
