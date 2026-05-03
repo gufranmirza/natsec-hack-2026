@@ -1,23 +1,39 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  AlertTriangle,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  Crosshair,
+  Eye,
+  Heart,
+  HelpCircle,
+  type LucideIcon,
+  Minus,
+  Plane,
+  PlaneTakeoff,
+  Plus,
+  Rocket,
+  Ship,
+  Truck,
+  User,
+  Users,
+  Zap,
+} from 'lucide-react';
 
+import { DronePovPanel } from '@/components/_columns/drone-pov-panel';
 import deepStateOccupied from '@/lib/fixtures/deepstate-occupied-20260502.json';
-import type {
-  AnyObject,
-  Entity,
-  Event,
-  LatLon,
-  Recommendation,
-  Unit,
-} from '@/types/ontology';
+import type { AnyObject, Entity, LatLon, Unit } from '@/types/ontology';
 import { MAP_VIEWBOX } from '@/types/ontology';
+
+const PAN_STEP = 72;
 
 interface ColMapProps {
   entities: Entity[];
   units: Unit[];
-  events: Event[];
-  recommendations: Recommendation[];
   selectedId?: string;
   onSelect: (o: AnyObject) => void;
 }
@@ -47,8 +63,9 @@ type DeepStateFeatureCollection = {
 
 const TILE_HOSTS = ['a', 'b', 'c', 'd'] as const;
 const MIN_ZOOM = 6;
-const MAX_ZOOM = 8;
+const MAX_ZOOM = 10;
 const DEFAULT_ZOOM = 7;
+const ZOOM_SCALE_BASE = 1.4;
 const TILE_SIZE = 256;
 
 const MAP_BOUNDS = {
@@ -84,33 +101,81 @@ const ENGLISH_LABELS = [
   },
 ];
 
-const ROUTE: LatLon[] = [
-  [48.67, 37.35],
-  [48.7, 37.52],
-  [48.72, 37.62],
-  [48.75, 37.78],
-  [48.78, 37.9],
-];
-
-const MARKER_OFFSETS: Record<string, { x: number; y: number }> = {
-  'ROOK-1': { x: -154, y: -42 },
-  'ROOK-2': { x: 28, y: 26 },
-  'BRAVO-3': { x: -150, y: 22 },
-  'BOGEY-7': { x: 34, y: -58 },
-  'V-117': { x: 42, y: 68 },
-  'P-04': { x: -16, y: 2 },
+// Unit (blue team) icons — mirrors UNIT_SUBTYPE_META in col-status.tsx so
+// the map and Assets/Registry views agree on what each unit subtype looks
+// like. Adding a new UnitSubtype means updating both maps in lockstep.
+const UNIT_ICON: Record<Unit['_subtype'], LucideIcon> = {
+  command_post: Crosshair,
+  drone_isr: Plane,
+  drone_strike: PlaneTakeoff,
+  infantry_team: Users,
+  infantry_recon: Eye,
+  infantry_kinetic: Zap,
+  vehicle_mech: Truck,
+  vehicle_recon: Eye,
+  vehicle_himars: Rocket,
+  vehicle_mortar: Rocket,
+  vehicle_medical: Heart,
+  vehicle_logistic: Truck,
+  drone: Plane,
+  vehicle: Truck,
+  infantry: Users,
+  boat: Ship,
 };
 
-export function ColMap({
-  entities,
-  units,
-  events,
-  recommendations,
-  selectedId,
-  onSelect,
-}: ColMapProps) {
+function markerIcon(object: Unit | Entity): LucideIcon {
+  if (object._type === 'Unit') {
+    return UNIT_ICON[object._subtype] ?? HelpCircle;
+  }
+  switch (object._subtype) {
+    case 'Aircraft':
+      return Plane;
+    case 'Vehicle':
+      return Truck;
+    case 'Vessel':
+      return Ship;
+    case 'Person':
+      return User;
+    case 'Threat':
+      return AlertTriangle;
+    case 'Unknown':
+      return HelpCircle;
+  }
+  return HelpCircle;
+}
+
+const ORIENTABLE_ICONS = new Set<LucideIcon>([
+  Plane,
+  PlaneTakeoff,
+  Ship,
+  Truck,
+  Rocket,
+]);
+
+export function ColMap({ entities, units, selectedId, onSelect }: ColMapProps) {
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  const [povOpen, setPovOpen] = useState(false);
+  const dragRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+
+  const selectedDrone = useMemo(() => {
+    if (!selectedId) return null;
+    const unit = units.find((u) => u._id === selectedId);
+    if (!unit) return null;
+    const hasCamera = unit.capabilities.some((c) =>
+      ['optical', 'eo', 'ir'].includes(c)
+    );
+    return hasCamera ? unit : null;
+  }, [selectedId, units]);
+
+  useEffect(() => {
+    setPovOpen(Boolean(selectedDrone));
+    // re-fire only on drone identity change, not on position-only updates
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDrone?._id]);
+
+  const showPov = povOpen && selectedDrone;
   const [keplerStats, setKeplerStats] = useState({
     rows: 0,
     fields: 0,
@@ -143,12 +208,52 @@ export function ColMap({
     };
   }, []);
 
+  useEffect(() => {
+    if (!dragging) return;
+    const onMove = (event: PointerEvent) => {
+      setPan({
+        x: dragRef.current.panX + (event.clientX - dragRef.current.x),
+        y: dragRef.current.panY + (event.clientY - dragRef.current.y),
+      });
+    };
+    const onUp = () => setDragging(false);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+  }, [dragging]);
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLElement>) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    if ((event.target as HTMLElement).closest('button, a, input')) return;
+    dragRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+      panX: pan.x,
+      panY: pan.y,
+    };
+    setDragging(true);
+  };
+
   return (
-    <section className="relative h-full overflow-hidden bg-[hsl(220_12%_84%)]">
+    <section
+      className={[
+        'relative h-full touch-none overflow-hidden bg-[hsl(220_12%_84%)] select-none',
+        dragging ? 'cursor-grabbing' : 'cursor-grab',
+      ].join(' ')}
+      onPointerDown={handlePointerDown}
+    >
       <div
-        className="absolute inset-0 transition-transform duration-200 ease-out"
+        className={[
+          'absolute inset-0',
+          dragging ? '' : 'transition-transform duration-200 ease-out',
+        ].join(' ')}
         style={{
-          transform: `translate(${pan.x}px, ${pan.y}px) scale(1.08)`,
+          transform: `translate(${pan.x}px, ${pan.y}px) scale(${Math.max(1.08, 1.08 * ZOOM_SCALE_BASE ** (zoom - DEFAULT_ZOOM))})`,
           transformOrigin: 'center',
         }}
       >
@@ -157,7 +262,6 @@ export function ColMap({
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(transparent_0,transparent_23px,hsl(220_20%_10%/0.065)_24px),linear-gradient(90deg,transparent_0,transparent_23px,hsl(220_20%_10%/0.055)_24px)] bg-[length:24px_24px]" />
 
         <DeepStateLayer paths={occupiedPaths} />
-        <MissionVectors entities={entities} units={units} />
         <EnglishLabels />
         <MissionMarkers
           entities={entities}
@@ -187,24 +291,12 @@ export function ColMap({
           <span className="text-success font-mono text-[10px]">local</span>
         </div>
         <div className="grid gap-1 font-mono text-[10px]">
-          <LayerRow label="Kepler.gl processor" tone="friendly" />
           <LayerRow label="DeepState GeoJSON" tone="threat" />
           <LayerRow label="CARTO English tiles" tone="muted" />
-          <LayerRow label="OSINT geotag cue" tone="warning" />
           <LayerRow label="Friendly telemetry" tone="friendly" />
-          <LayerRow label="RF search area" tone="warning" />
+          <LayerRow label="OSINT geotag cue" tone="warning" />
         </div>
       </div>
-
-      <UnifiedFeedsPanel entities={entities} units={units} events={events} />
-
-      <AlertsPriorityPanel
-        entities={entities}
-        units={units}
-        events={events}
-        recommendations={recommendations}
-        onSelect={onSelect}
-      />
 
       <div className="border-border bg-card/95 absolute bottom-3 left-3 z-30 max-w-[275px] border px-3 py-2 backdrop-blur">
         <div className="label-cap-sm text-muted-foreground">Dataset</div>
@@ -218,86 +310,24 @@ export function ColMap({
         </div>
       </div>
 
-      <RealTimeMapFeed events={events} onSelect={onSelect} />
-      <SupervisedWorkflowPanel recommendations={recommendations} />
+      <MapNavControls
+        zoom={zoom}
+        onZoomIn={() => setZoom((c) => Math.min(MAX_ZOOM, c + 1))}
+        onZoomOut={() => setZoom((c) => Math.max(MIN_ZOOM, c - 1))}
+        onPan={(dx, dy) => setPan((c) => ({ x: c.x + dx, y: c.y + dy }))}
+        onReset={() => setPan({ x: 0, y: 0 })}
+      />
 
-      <div className="border-border bg-card/95 absolute bottom-3 right-3 z-30 grid border backdrop-blur">
-        <button
-          type="button"
-          onClick={() => setZoom((current) => Math.min(MAX_ZOOM, current + 1))}
-          className="border-border hover:bg-secondary grid size-8 place-items-center border-b font-mono text-[15px] font-bold"
-          aria-label="Zoom in"
-        >
-          +
-        </button>
-        <button
-          type="button"
-          onClick={() => setZoom((current) => Math.max(MIN_ZOOM, current - 1))}
-          className="hover:bg-secondary grid size-8 place-items-center font-mono text-[15px] font-bold"
-          aria-label="Zoom out"
-        >
-          -
-        </button>
-      </div>
-
-      <div className="border-border bg-card/95 absolute bottom-3 right-14 z-30 grid grid-cols-3 border backdrop-blur">
-        <span className="size-8" />
-        <button
-          type="button"
-          onClick={() =>
-            setPan((current) => ({ ...current, y: current.y + 72 }))
-          }
-          className="border-border hover:bg-secondary grid size-8 place-items-center border-b border-l font-mono text-[12px] font-bold"
-          aria-label="Pan map up"
-        >
-          U
-        </button>
-        <button
-          type="button"
-          onClick={() => setPan({ x: 0, y: 0 })}
-          className="border-border hover:bg-secondary grid size-8 place-items-center border-b border-l font-mono text-[10px] font-bold"
-          aria-label="Reset map pan"
-        >
-          C
-        </button>
-        <button
-          type="button"
-          onClick={() =>
-            setPan((current) => ({ ...current, x: current.x + 72 }))
-          }
-          className="border-border hover:bg-secondary grid size-8 place-items-center border-t font-mono text-[12px] font-bold"
-          aria-label="Pan map left"
-        >
-          L
-        </button>
-        <button
-          type="button"
-          onClick={() =>
-            setPan((current) => ({ ...current, y: current.y - 72 }))
-          }
-          className="border-border hover:bg-secondary grid size-8 place-items-center border-l border-t font-mono text-[12px] font-bold"
-          aria-label="Pan map down"
-        >
-          D
-        </button>
-        <button
-          type="button"
-          onClick={() =>
-            setPan((current) => ({ ...current, x: current.x - 72 }))
-          }
-          className="border-border hover:bg-secondary grid size-8 place-items-center border-l border-t font-mono text-[12px] font-bold"
-          aria-label="Pan map right"
-        >
-          R
-        </button>
-      </div>
+      {showPov && selectedDrone ? (
+        <DronePovPanel unit={selectedDrone} onClose={() => setPovOpen(false)} />
+      ) : null}
     </section>
   );
 }
 
 function TileMosaic({ tiles }: { tiles: Tile[] }) {
   return (
-    <div className="absolute inset-0 opacity-80">
+    <div className="absolute inset-0">
       {tiles.map((tile) => (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -363,75 +393,6 @@ function DeepStateLayer({ paths }: { paths: string[] }) {
   );
 }
 
-function MissionVectors({
-  entities,
-  units,
-}: {
-  entities: Entity[];
-  units: Unit[];
-}) {
-  const routePath = toPath(ROUTE);
-  const rf = projectToSvg([48.78, 37.9]);
-
-  return (
-    <svg
-      className="pointer-events-none absolute inset-0 z-20 size-full"
-      viewBox={`0 0 ${MAP_VIEWBOX.w} ${MAP_VIEWBOX.h}`}
-      preserveAspectRatio="none"
-      aria-hidden
-    >
-      <path
-        d={routePath}
-        fill="none"
-        stroke="hsl(var(--background))"
-        strokeWidth="16"
-        strokeLinecap="square"
-        opacity="0.88"
-      />
-      <path
-        d={routePath}
-        fill="none"
-        stroke="hsl(var(--warning))"
-        strokeWidth="5"
-        strokeDasharray="18 14"
-        strokeLinecap="square"
-      />
-      <ellipse
-        cx={rf.x}
-        cy={rf.y}
-        rx="78"
-        ry="56"
-        fill="hsl(var(--warning) / 0.15)"
-        stroke="hsl(var(--warning))"
-        strokeWidth="3"
-        strokeDasharray="10 10"
-      />
-      {[...entities, ...units].map((object) => (
-        <TrackLine key={`track-${object._id}`} object={object} />
-      ))}
-    </svg>
-  );
-}
-
-function TrackLine({ object }: { object: Entity | Unit }) {
-  const point = projectToSvg(object.position);
-  const isFriendly =
-    object._type === 'Unit' || object.affiliation === 'friendly';
-  const dx = isFriendly ? -56 : -72;
-  const dy = isFriendly ? 32 : -42;
-
-  return (
-    <path
-      d={`M ${point.x + dx} ${point.y + dy} L ${point.x - dx * 0.18} ${point.y - dy * 0.18} L ${point.x} ${point.y}`}
-      fill="none"
-      stroke={isFriendly ? 'hsl(var(--friendly))' : 'hsl(var(--threat))'}
-      strokeWidth="4"
-      strokeDasharray="9 8"
-      opacity="0.78"
-    />
-  );
-}
-
 function EnglishLabels() {
   return (
     <div className="pointer-events-none absolute inset-0 z-20">
@@ -458,9 +419,20 @@ function EnglishLabels() {
   );
 }
 
+function hasValidPosition<T extends { position?: unknown }>(o: T): boolean {
+  return (
+    Array.isArray(o.position) &&
+    o.position.length === 2 &&
+    typeof o.position[0] === 'number' &&
+    typeof o.position[1] === 'number' &&
+    Number.isFinite(o.position[0]) &&
+    Number.isFinite(o.position[1])
+  );
+}
+
 function MissionMarkers({
-  entities,
-  units,
+  entities: entitiesIn,
+  units: unitsIn,
   selectedId,
   onSelect,
 }: {
@@ -469,445 +441,207 @@ function MissionMarkers({
   selectedId?: string;
   onSelect: (o: AnyObject) => void;
 }) {
+  const units = useMemo(() => unitsIn.filter(hasValidPosition), [unitsIn]);
+  const entities = useMemo(
+    () => entitiesIn.filter(hasValidPosition),
+    [entitiesIn]
+  );
+
+  const initialPositions = useRef(new Map<string, LatLon>());
+  for (const u of units) {
+    if (!initialPositions.current.has(u._id)) {
+      initialPositions.current.set(u._id, u.position);
+    }
+  }
+  for (const e of entities) {
+    if (!initialPositions.current.has(e._id)) {
+      initialPositions.current.set(e._id, e.position);
+    }
+  }
+  const idKey = useMemo(
+    () =>
+      [...units.map((u) => u._id), ...entities.map((e) => e._id)]
+        .sort()
+        .join('|'),
+    [units, entities]
+  );
+  const offsets = useMemo(() => {
+    const items: {
+      id: string;
+      x: number;
+      y: number;
+      ox: number;
+      oy: number;
+    }[] = [];
+    for (const u of units) {
+      const seed = initialPositions.current.get(u._id) ?? u.position;
+      const p = projectToSvg(seed);
+      items.push({ id: u._id, x: p.x, y: p.y, ox: p.x, oy: p.y });
+    }
+    for (const e of entities) {
+      const seed = initialPositions.current.get(e._id) ?? e.position;
+      const p = projectToSvg(seed);
+      items.push({ id: e._id, x: p.x, y: p.y, ox: p.x, oy: p.y });
+    }
+    for (let iter = 0; iter < MARKER_LAYOUT_ITERS; iter += 1) {
+      let moved = false;
+      for (let i = 0; i < items.length; i += 1) {
+        for (let j = i + 1; j < items.length; j += 1) {
+          const a = items[i];
+          const b = items[j];
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const d = Math.hypot(dx, dy) || 0.001;
+          if (d < MARKER_MIN_DIST) {
+            const push = (MARKER_MIN_DIST - d) / 2;
+            const nx = dx / d;
+            const ny = dy / d;
+            a.x -= nx * push;
+            a.y -= ny * push;
+            b.x += nx * push;
+            b.y += ny * push;
+            moved = true;
+          }
+        }
+      }
+      if (!moved) break;
+    }
+    const map = new Map<string, { dx: number; dy: number }>();
+    for (const it of items)
+      map.set(it.id, { dx: it.x - it.ox, dy: it.y - it.oy });
+    return map;
+    // re-run only when the set of ids changes, not on per-tick position updates
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idKey]);
+
   return (
     <div className="absolute inset-0 z-20">
-      {units.map((unit) => (
-        <MarkerButton
-          key={unit._id}
-          label={unit.callsign}
-          meta={`${unit.status.toUpperCase()} · BAT ${unit.battery_pct ?? '--'}%`}
-          tone="friendly"
-          position={unit.position}
-          selected={unit._id === selectedId}
-          onClick={() => onSelect(unit)}
-        />
-      ))}
-      {entities.map((entity) => (
-        <MarkerButton
-          key={entity._id}
-          label={entity.name ?? entity._id}
-          meta={`${entity._subtype.toUpperCase()} · ${Math.round(
-            entity.confidence * 100
-          )}%`}
-          tone={entity.affiliation === 'hostile' ? 'threat' : 'warning'}
-          position={entity.position}
-          selected={entity._id === selectedId}
-          onClick={() => onSelect(entity)}
-        />
-      ))}
-    </div>
-  );
-}
-
-function UnifiedFeedsPanel({
-  entities,
-  units,
-  events,
-}: {
-  entities: Entity[];
-  units: Unit[];
-  events: Event[];
-}) {
-  const sourceRows = [
-    {
-      label: 'Sensor tracks',
-      value: entities.length,
-      meta: `${events.filter((event) => event._subtype === 'detection').length} detections`,
-      tone: 'friendly' as const,
-    },
-    {
-      label: 'Unit positions',
-      value: units.length,
-      meta: `${units.filter((unit) => unit.status !== 'offline').length} online`,
-      tone: 'friendly' as const,
-    },
-    {
-      label: 'Vehicles',
-      value: entities.filter((entity) => entity._subtype === 'Vehicle').length,
-      meta: 'track + route relation',
-      tone: 'warning' as const,
-    },
-    {
-      label: 'Comms',
-      value: events.filter((event) => event._source.includes('voice')).length,
-      meta: 'radio-linked',
-      tone: 'muted' as const,
-    },
-    {
-      label: 'Intel reports',
-      value: events.filter((event) => event._source === 'mission-ai').length,
-      meta: 'parsed to graph',
-      tone: 'muted' as const,
-    },
-    {
-      label: 'RF / OSINT',
-      value: events.filter(
-        (event) => event._source === 'radio' || event._source === 'social'
-      ).length,
-      meta: 'cross-cued',
-      tone: 'warning' as const,
-    },
-  ];
-
-  return (
-    <div className="border-border bg-card/95 absolute right-3 top-[178px] z-30 hidden w-[236px] border backdrop-blur xl:block">
-      <div className="border-border border-b px-3 py-2">
-        <div className="label-cap-sm text-muted-foreground">Unified feeds</div>
-        <div className="text-foreground font-mono text-[11px] font-bold">
-          Live source fusion
-        </div>
-      </div>
-      <div className="bg-border grid gap-px">
-        {sourceRows.map((row) => (
-          <div
-            key={row.label}
-            className="bg-card grid grid-cols-[1fr_auto] gap-2 px-3 py-2"
-          >
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className={`size-1.5 shrink-0 ${sourceDot(row.tone)}`} />
-                <span className="text-foreground truncate font-mono text-[10px] font-bold">
-                  {row.label}
-                </span>
-              </div>
-              <div className="text-muted-foreground mt-0.5 truncate font-mono text-[9px]">
-                {row.meta}
-              </div>
-            </div>
-            <span className="text-primary font-mono text-[13px] font-bold">
-              {row.value}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function AlertsPriorityPanel({
-  entities,
-  units,
-  events,
-  recommendations,
-  onSelect,
-}: {
-  entities: Entity[];
-  units: Unit[];
-  events: Event[];
-  recommendations: Recommendation[];
-  onSelect: (o: AnyObject) => void;
-}) {
-  const criticalEvents = events.filter(
-    (event) => event.severity === 'critical'
-  );
-  const warningEvents = events.filter((event) => event.severity === 'warn');
-  const pendingRecommendations = recommendations.filter(
-    (recommendation) => recommendation.status === 'pending'
-  );
-  const lowBattery = units.filter(
-    (unit) => unit._subtype === 'drone' && (unit.battery_pct ?? 100) < 45
-  );
-  const highThreat = entities.filter(
-    (entity) =>
-      entity.affiliation === 'hostile' || entity.threat_level === 'high'
-  );
-  const priorityRows = [
-    ...criticalEvents.slice(0, 2).map((event) => ({
-      key: event._id,
-      tone: 'critical' as const,
-      label: event.verb ?? event._subtype,
-      body: event.description,
-      meta: _time(event._observed_at),
-      object: event as AnyObject,
-    })),
-    ...pendingRecommendations.slice(0, 2).map((recommendation) => ({
-      key: recommendation._id,
-      tone: 'decision' as const,
-      label: `${recommendation.verb} ${recommendation.asset_callsign ?? 'asset'}`,
-      body: recommendation.short,
-      meta: `${Math.round(recommendation.confidence * 100)}% · approval`,
-      object: recommendation as AnyObject,
-    })),
-    ...warningEvents.slice(0, 2).map((event) => ({
-      key: event._id,
-      tone: 'warning' as const,
-      label: event.verb ?? event._subtype,
-      body: event.description,
-      meta: _time(event._observed_at),
-      object: event as AnyObject,
-    })),
-  ].slice(0, 4);
-
-  return (
-    <div className="border-border bg-card/95 absolute left-[280px] right-[260px] top-3 z-30 hidden border backdrop-blur xl:block">
-      <div className="border-border flex items-center justify-between gap-4 border-b px-3 py-2">
-        <div>
-          <div className="label-cap-sm text-muted-foreground">
-            Alerts & priorities
-          </div>
-          <div className="text-foreground font-mono text-[11px] font-bold">
-            Commander attention queue
-          </div>
-        </div>
-        <div className="border-border bg-border grid min-w-[360px] grid-cols-4 gap-px overflow-hidden border">
-          <PriorityMetric
-            label="Critical"
-            value={criticalEvents.length}
-            tone="critical"
+      {units.map((unit) => {
+        const truePoint = projectToSvg(unit.position);
+        const off = offsets.get(unit._id) ?? { dx: 0, dy: 0 };
+        return (
+          <MarkerButton
+            key={unit._id}
+            point={{ x: truePoint.x + off.dx, y: truePoint.y + off.dy }}
+            label={unit.callsign}
+            meta={`${unit.status.toUpperCase()} · BAT ${unit.battery_pct ?? '--'}%`}
+            tone="friendly"
+            icon={markerIcon(unit)}
+            heading={unit.heading_deg}
+            selected={unit._id === selectedId}
+            onClick={() => onSelect(unit)}
           />
-          <PriorityMetric
-            label="Decisions"
-            value={pendingRecommendations.length}
-            tone="decision"
+        );
+      })}
+      {entities.map((entity) => {
+        const truePoint = projectToSvg(entity.position);
+        const off = offsets.get(entity._id) ?? { dx: 0, dy: 0 };
+        return (
+          <MarkerButton
+            key={entity._id}
+            point={{ x: truePoint.x + off.dx, y: truePoint.y + off.dy }}
+            label={entity.name ?? entity._id}
+            meta={`${entity._subtype.toUpperCase()} · ${Math.round(
+              entity.confidence * 100
+            )}%`}
+            tone={entity.affiliation === 'hostile' ? 'threat' : 'warning'}
+            icon={markerIcon(entity)}
+            heading={entity.heading_deg}
+            selected={entity._id === selectedId}
+            onClick={() => onSelect(entity)}
           />
-          <PriorityMetric
-            label="Battery"
-            value={lowBattery.length}
-            tone="warning"
-          />
-          <PriorityMetric
-            label="Threats"
-            value={highThreat.length}
-            tone="critical"
-          />
-        </div>
-      </div>
-      <div className="divide-border grid grid-cols-4 divide-x">
-        {priorityRows.map((row) => (
-          <button
-            key={row.key}
-            type="button"
-            onClick={() => onSelect(row.object)}
-            className="hover:bg-secondary min-w-0 px-3 py-2 text-left"
-          >
-            <div className="mb-1 flex items-center gap-2">
-              <span className={`size-1.5 shrink-0 ${priorityDot(row.tone)}`} />
-              <span className="text-foreground truncate font-mono text-[10px] font-bold">
-                {row.label}
-              </span>
-              <span className="text-muted-foreground ml-auto font-mono text-[9px]">
-                {row.meta}
-              </span>
-            </div>
-            <p className="text-muted-foreground line-clamp-2 text-[10px] leading-snug">
-              {row.body}
-            </p>
-          </button>
-        ))}
-      </div>
+        );
+      })}
     </div>
   );
 }
 
-function SupervisedWorkflowPanel({
-  recommendations,
-}: {
-  recommendations: Recommendation[];
-}) {
-  const pending = recommendations.filter(
-    (recommendation) => recommendation.status === 'pending'
-  ).length;
-  const accepted = recommendations.filter(
-    (recommendation) => recommendation.status === 'accepted'
-  ).length;
-  const steps = [
-    ['Detect', 'RF/EO cue'],
-    ['Identify', 'graph link'],
-    ['Recommend', `${pending} pending`],
-    ['Approve', 'human gate'],
-    ['Task', 'ISR only'],
-    ['Audit', `${accepted} accepted`],
-  ];
-
-  return (
-    <div className="border-border bg-card/95 absolute bottom-3 right-[104px] z-30 hidden w-[430px] border backdrop-blur xl:block">
-      <div className="border-border flex items-baseline justify-between border-b px-3 py-2">
-        <div>
-          <div className="label-cap-sm text-muted-foreground">
-            Supervised decision chain
-          </div>
-          <div className="text-foreground font-mono text-[11px] font-bold">
-            Detect to tasking with approval gate
-          </div>
-        </div>
-        <span className="text-warning font-mono text-[9px] font-bold uppercase">
-          HITL
-        </span>
-      </div>
-      <div className="divide-border grid grid-cols-6 divide-x">
-        {steps.map(([label, meta], index) => (
-          <div key={label} className="p-2 text-center">
-            <div
-              className={[
-                'mx-auto mb-1 grid size-5 place-items-center font-mono text-[10px] font-bold',
-                index < 3
-                  ? 'bg-primary text-primary-foreground'
-                  : index === 3
-                    ? 'bg-warning text-background'
-                    : 'bg-secondary text-foreground',
-              ].join(' ')}
-            >
-              {index + 1}
-            </div>
-            <div className="text-foreground truncate font-mono text-[9px] font-bold">
-              {label}
-            </div>
-            <div className="text-muted-foreground mt-0.5 truncate font-mono text-[8px]">
-              {meta}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function PriorityMetric({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone: 'critical' | 'decision' | 'warning';
-}) {
-  return (
-    <div className="bg-card px-2 py-1.5">
-      <div className="text-muted-foreground font-mono text-[8px] uppercase">
-        {label}
-      </div>
-      <div
-        className={[
-          'mt-0.5 font-mono text-[14px] font-bold',
-          tone === 'critical'
-            ? 'text-threat'
-            : tone === 'decision'
-              ? 'text-primary'
-              : 'text-warning',
-        ].join(' ')}
-      >
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function priorityDot(tone: 'critical' | 'decision' | 'warning') {
-  if (tone === 'critical') return 'bg-threat';
-  if (tone === 'decision') return 'bg-primary';
-  return 'bg-warning';
-}
-
-function sourceDot(tone: 'friendly' | 'warning' | 'muted') {
-  if (tone === 'friendly') return 'bg-friendly';
-  if (tone === 'warning') return 'bg-warning';
-  return 'bg-muted-foreground';
-}
-
-function RealTimeMapFeed({
-  events,
-  onSelect,
-}: {
-  events: Event[];
-  onSelect: (o: AnyObject) => void;
-}) {
-  return (
-    <div className="border-border bg-card/95 absolute bottom-3 left-[304px] z-30 hidden w-[360px] border backdrop-blur xl:block">
-      <div className="border-border flex items-baseline justify-between border-b px-3 py-2">
-        <div>
-          <div className="label-cap-sm text-muted-foreground">
-            Real-time feed
-          </div>
-          <div className="text-foreground font-mono text-[11px] font-bold">
-            Latest mission deltas
-          </div>
-        </div>
-        <span className="text-primary font-mono text-[10px]">
-          {events.length} events
-        </span>
-      </div>
-      <div className="max-h-[236px] overflow-y-auto">
-        {events.slice(0, 8).map((event) => (
-          <button
-            key={event._id}
-            type="button"
-            onClick={() => onSelect(event)}
-            className="border-border hover:bg-secondary grid w-full grid-cols-[58px_1fr] gap-2 border-b px-3 py-2 text-left last:border-b-0"
-          >
-            <span className="text-muted-foreground font-mono text-[9px]">
-              {_time(event._observed_at)}
-            </span>
-            <span className="min-w-0">
-              <span className="flex items-center gap-2">
-                <span
-                  className={[
-                    'size-1.5 shrink-0',
-                    event.severity === 'critical'
-                      ? 'bg-threat'
-                      : event.severity === 'warn'
-                        ? 'bg-warning'
-                        : 'bg-primary',
-                  ].join(' ')}
-                />
-                <span className="text-foreground truncate font-mono text-[10px] font-bold">
-                  {event.verb ?? event._subtype}
-                </span>
-              </span>
-              <span className="text-muted-foreground mt-1 line-clamp-2 text-[10px] leading-snug">
-                {event.description}
-              </span>
-            </span>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
+const MARKER_MIN_DIST = 38;
+const MARKER_LAYOUT_ITERS = 50;
 
 function MarkerButton({
+  point,
   label,
   meta,
   tone,
-  position,
+  icon: Icon,
+  heading,
   selected,
   onClick,
 }: {
+  point: { x: number; y: number };
   label: string;
   meta: string;
   tone: 'friendly' | 'threat' | 'warning';
-  position: LatLon;
+  icon: LucideIcon;
+  heading?: number;
   selected: boolean;
   onClick: () => void;
 }) {
+  const toneText =
+    tone === 'friendly'
+      ? 'text-friendly'
+      : tone === 'threat'
+        ? 'text-threat'
+        : 'text-warning';
+  const toneRing =
+    tone === 'friendly'
+      ? 'ring-friendly'
+      : tone === 'threat'
+        ? 'ring-threat'
+        : 'ring-warning';
+  const iconStyle =
+    heading !== undefined && ORIENTABLE_ICONS.has(Icon)
+      ? { transform: `rotate(${heading}deg)` }
+      : undefined;
   return (
     <button
       type="button"
       onClick={onClick}
       className={[
-        'absolute flex max-w-[148px] items-center gap-2 border bg-[hsl(220_18%_8%/0.92)] px-2 py-1 text-left shadow-none backdrop-blur transition-transform hover:scale-[1.02]',
-        selected ? 'ring-primary ring-1' : '',
-        tone === 'friendly'
-          ? 'border-friendly text-friendly'
-          : tone === 'threat'
-            ? 'border-threat text-threat'
-            : 'border-warning text-warning',
+        'group absolute -translate-x-1/2 -translate-y-1/2',
+        selected ? 'z-30' : 'z-20',
       ].join(' ')}
       style={{
-        ...positionStyle(position),
-        marginLeft: `${MARKER_OFFSETS[label]?.x ?? 8}px`,
-        marginTop: `${MARKER_OFFSETS[label]?.y ?? -12}px`,
+        // Quantize to 4dp — full float precision differs between
+        // Next's SSR string output and the client's render and trips
+        // a hydration mismatch on every marker. 4dp is well below
+        // sub-pixel granularity so visually identical.
+        left: `${((point.x / MAP_VIEWBOX.w) * 100).toFixed(4)}%`,
+        top: `${((point.y / MAP_VIEWBOX.h) * 100).toFixed(4)}%`,
       }}
       aria-label={label}
     >
-      <span className="block size-2 shrink-0 bg-current" />
-      <span className="min-w-0">
-        <span className="block truncate font-mono text-[10px] font-bold leading-none">
+      <Icon
+        className={[
+          'size-4 drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)] transition-transform group-hover:scale-125',
+          selected
+            ? `${toneText} ${toneRing} rounded-full ring-2 ring-offset-1 ring-offset-[hsl(220_12%_84%)]`
+            : toneText,
+        ].join(' ')}
+        strokeWidth={2.6}
+        style={iconStyle}
+      />
+      {selected ? (
+        <span
+          className={[
+            'pointer-events-none absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap font-mono text-[9px] font-bold leading-none [text-shadow:0_1px_2px_rgba(0,0,0,0.85)]',
+            toneText,
+          ].join(' ')}
+        >
+          {label}
+          <span className="text-muted-foreground ml-1.5">{meta}</span>
+        </span>
+      ) : (
+        <span
+          className={[
+            'pointer-events-none absolute left-1/2 top-full mt-1 -translate-x-1/2 whitespace-nowrap font-mono text-[9px] font-bold leading-none opacity-0 transition-opacity [text-shadow:0_1px_2px_rgba(0,0,0,0.85)] group-hover:opacity-100',
+            toneText,
+          ].join(' ')}
+        >
           {label}
         </span>
-        <span className="text-muted-foreground mt-0.5 block truncate font-mono text-[9px] leading-none">
-          {meta}
-        </span>
-      </span>
+      )}
     </button>
   );
 }
@@ -997,17 +731,94 @@ function positionStyle(position: LatLon) {
   };
 }
 
-function toPath(points: LatLon[]) {
-  return points
-    .map((point, index) => {
-      const { x, y } = projectToSvg(point);
-      return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
-    })
-    .join(' ');
-}
-
-function _time(iso: string) {
-  return iso.split('T')[1]?.slice(0, 8) ?? iso;
+function MapNavControls({
+  zoom,
+  onZoomIn,
+  onZoomOut,
+  onPan,
+  onReset,
+}: {
+  zoom: number;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onPan: (dx: number, dy: number) => void;
+  onReset: () => void;
+}) {
+  const padBtn =
+    'border-border bg-card hover:bg-secondary text-foreground grid size-8 place-items-center border';
+  const zoomBtn =
+    'border-border bg-card hover:bg-secondary text-foreground grid size-9 place-items-center border';
+  return (
+    <div className="absolute bottom-3 right-3 z-30 flex items-end gap-2">
+      <div className="grid grid-cols-3 grid-rows-3 gap-1">
+        <span />
+        <button
+          type="button"
+          aria-label="Pan north"
+          onClick={() => onPan(0, PAN_STEP)}
+          className={padBtn}
+        >
+          <ChevronUp className="size-4" />
+        </button>
+        <span />
+        <button
+          type="button"
+          aria-label="Pan west"
+          onClick={() => onPan(PAN_STEP, 0)}
+          className={padBtn}
+        >
+          <ChevronLeft className="size-4" />
+        </button>
+        <button
+          type="button"
+          aria-label="Recenter map"
+          onClick={onReset}
+          className={padBtn}
+        >
+          <Crosshair className="text-muted-foreground size-3.5" />
+        </button>
+        <button
+          type="button"
+          aria-label="Pan east"
+          onClick={() => onPan(-PAN_STEP, 0)}
+          className={padBtn}
+        >
+          <ChevronRight className="size-4" />
+        </button>
+        <span />
+        <button
+          type="button"
+          aria-label="Pan south"
+          onClick={() => onPan(0, -PAN_STEP)}
+          className={padBtn}
+        >
+          <ChevronDown className="size-4" />
+        </button>
+        <span />
+      </div>
+      <div className="bg-card border-border flex flex-col border backdrop-blur">
+        <button
+          type="button"
+          aria-label="Zoom in"
+          onClick={onZoomIn}
+          className={`${zoomBtn} border-0 border-b`}
+        >
+          <Plus className="size-4" />
+        </button>
+        <span className="text-muted-foreground border-border grid size-9 place-items-center border-b font-mono text-[10px]">
+          Z{zoom}
+        </span>
+        <button
+          type="button"
+          aria-label="Zoom out"
+          onClick={onZoomOut}
+          className={`${zoomBtn} border-0`}
+        >
+          <Minus className="size-4" />
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function MapMetric({ label, value }: { label: string; value: string }) {
