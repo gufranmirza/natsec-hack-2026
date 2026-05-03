@@ -2,15 +2,30 @@
 
 import { useEffect, useState } from 'react';
 import {
+  AlertTriangle,
   Brain,
   Camera,
+  Crosshair,
   Database,
+  Eye,
   FileStack,
   GitBranch,
+  Globe,
+  Heart,
+  Lightbulb,
   Plane,
+  PlaneTakeoff,
   Radar,
+  Radio,
+  Rocket,
+  Satellite,
   Search,
   ShieldCheck,
+  Truck,
+  User,
+  Users,
+  Zap,
+  type LucideIcon,
 } from 'lucide-react';
 
 import { ColMap } from '@/components/_columns/col-map';
@@ -505,32 +520,42 @@ function OntologySurface({
       />
       <div className="bg-border grid min-h-0 flex-1 grid-cols-[minmax(320px,0.8fr)_minmax(0,1.2fr)] gap-px">
         <div className="bg-card min-h-0 overflow-y-auto">
-          {objects.map((object) => (
-            <button
-              key={object._id}
-              type="button"
-              onClick={() => onSelect(object)}
-              className={[
-                'grid w-full grid-cols-[92px_1fr_auto] items-center gap-3 border-b border-border px-4 py-3 text-left hover:bg-secondary',
-                selectedId === object._id ? 'bg-secondary' : '',
-              ].join(' ')}
-            >
-              <span className="label-cap-sm text-muted-foreground">
-                {object._type}
-              </span>
-              <span className="min-w-0">
-                <span className="text-foreground block truncate font-mono text-[12px] font-bold">
-                  {objectName(object)}
+          {objects.map((object) => {
+            const meta = registryRowMeta(object);
+            const Icon = meta.icon;
+            return (
+              <button
+                key={object._id}
+                type="button"
+                onClick={() => onSelect(object)}
+                className={[
+                  'grid w-full grid-cols-[28px_72px_1fr_auto] items-center gap-2.5 border-b border-border px-3 py-2.5 text-left hover:bg-secondary',
+                  selectedId === object._id ? 'bg-secondary' : '',
+                ].join(' ')}
+              >
+                <span
+                  aria-hidden
+                  className={`flex size-5 items-center justify-center ${meta.iconTone}`}
+                >
+                  <Icon className="size-3.5" strokeWidth={1.8} />
                 </span>
-                <span className="text-muted-foreground block truncate font-mono text-[10px]">
-                  {object._source} · v{object._version}
+                <span className="label-cap-sm text-muted-foreground">
+                  {object._type}
                 </span>
-              </span>
-              <span className="border-border text-muted-foreground border px-1.5 py-0.5 font-mono text-[9px]">
-                {_time(object._observed_at)}
-              </span>
-            </button>
-          ))}
+                <span className="min-w-0">
+                  <span className="text-foreground block truncate font-mono text-[12px] font-bold">
+                    {objectName(object)}
+                  </span>
+                  <span className="text-muted-foreground block truncate font-mono text-[10px]">
+                    {object._source} · v{object._version}
+                  </span>
+                </span>
+                <span className="border-border text-muted-foreground border px-1.5 py-0.5 font-mono text-[9px]">
+                  {_time(object._observed_at)}
+                </span>
+              </button>
+            );
+          })}
         </div>
         <div className="bg-background min-h-0 overflow-y-auto p-5">
           <div className="grid grid-cols-3 gap-3">
@@ -1667,6 +1692,150 @@ function missionMilestones(objective: MissionObjective) {
       body: 'Summarize deltas, confidence, evidence gaps, and next decision.',
     },
   ];
+}
+
+// registryRowMeta picks an icon + tone class for a registry row based
+// on what the object IS — same data-driven mapping pattern used for
+// Assets / Contacts in col-status. No callsign / id hardcoding.
+//
+// Tone semantics (matches the situational-awareness column):
+//   threat     → hostile RED entities, critical events, P0 objectives
+//   warning    → unknown affiliation, warn events, P1 objectives, en_route
+//   success    → friendly units, healthy assets, accepted recs
+//   primary    → blue-side ISR / aux info events
+//   muted      → neutral / completed / informational
+function registryRowMeta(object: AnyObject): {
+  icon: LucideIcon;
+  iconTone: string;
+} {
+  switch (object._type) {
+    case 'Unit': {
+      // Same UNIT_SUBTYPE_META pattern, locally re-mapped per-icon
+      // for this surface (col-status owns the canonical map).
+      const icon = unitTypeIcon(object._subtype);
+      return { icon, iconTone: 'text-success/80' };
+    }
+    case 'Entity': {
+      const tone =
+        object.affiliation === 'hostile'
+          ? 'text-threat'
+          : object.affiliation === 'unknown'
+            ? 'text-warning'
+            : object.affiliation === 'friendly'
+              ? 'text-success/80'
+              : 'text-muted-foreground/70'; // neutral / unset
+      // Class of platform → icon (Aircraft / Vehicle / Person / Threat).
+      const icon =
+        object._subtype === 'Aircraft'
+          ? Plane
+          : object._subtype === 'Vehicle'
+            ? Truck
+            : object._subtype === 'Person'
+              ? User
+              : object._subtype === 'Threat'
+                ? AlertTriangle
+                : Crosshair;
+      return { icon, iconTone: tone };
+    }
+    case 'Report': {
+      const icon =
+        object._subtype === 'radio'
+          ? Radio
+          : object._subtype === 'sigint'
+            ? Satellite
+            : object._subtype === 'osint'
+              ? Globe
+              : object._subtype === 'operator'
+                ? User
+                : FileStack;
+      return { icon, iconTone: 'text-primary/80' };
+    }
+    case 'Event': {
+      const tone =
+        object.severity === 'critical'
+          ? 'text-threat'
+          : object.severity === 'warn'
+            ? 'text-warning'
+            : 'text-muted-foreground/80';
+      // Pick an icon that hints at the event family.
+      const icon = eventIcon(object._subtype);
+      return { icon, iconTone: tone };
+    }
+    case 'Recommendation':
+      return { icon: Lightbulb, iconTone: 'text-primary' };
+    case 'MissionObjective':
+      return { icon: Crosshair, iconTone: 'text-primary' };
+    case 'Plan':
+      return { icon: GitBranch, iconTone: 'text-primary' };
+    case 'Mission':
+      return { icon: Radar, iconTone: 'text-primary' };
+    case 'TaskingOrder':
+      return { icon: Zap, iconTone: 'text-warning' };
+    default:
+      return { icon: Database, iconTone: 'text-muted-foreground' };
+  }
+}
+
+// Icon for a Unit subtype — duplicates the col-status UNIT_SUBTYPE_META
+// shape locally to avoid a cross-component import. Both columns derive
+// from the same UnitSubtype enum so they stay in lockstep.
+function unitTypeIcon(subtype: Unit['_subtype']): LucideIcon {
+  switch (subtype) {
+    case 'command_post':       return Crosshair;
+    case 'drone_isr':          return Plane;
+    case 'drone_strike':       return PlaneTakeoff;
+    case 'infantry_team':      return Users;
+    case 'infantry_recon':     return Eye;
+    case 'infantry_kinetic':   return Zap;
+    case 'vehicle_mech':       return Truck;
+    case 'vehicle_recon':      return Eye;
+    case 'vehicle_himars':     return Rocket;
+    case 'vehicle_mortar':     return Rocket;
+    case 'vehicle_medical':    return Heart;
+    case 'vehicle_logistic':   return Truck;
+    case 'drone':              return Plane;
+    case 'vehicle':            return Truck;
+    case 'infantry':           return Users;
+    case 'boat':               return Truck;
+    default:                   return Database;
+  }
+}
+
+// eventIcon picks a lucide glyph hinting at the event family. Many
+// EventSubtype values exist (~35); we group them broadly so the
+// registry stays scannable.
+function eventIcon(sub: Event['_subtype']): LucideIcon {
+  // kinetic
+  if (sub === 'artillery_impact' || sub === 'missile_launch' ||
+      sub === 'air_strike' || sub === 'fpv_strike' ||
+      sub === 'loitering_munition_engage' || sub === 'small_arms_contact' ||
+      sub === 'unit_destroyed' || sub === 'unit_damaged') {
+    return Zap;
+  }
+  // ISR
+  if (sub === 'visual_detection' || sub === 'cued_search' ||
+      sub === 'track_acquired' || sub === 'track_lost' ||
+      sub === 'regained_track' || sub === 'classification_upgrade' ||
+      sub === 'thermal_signature' || sub === 'detection') {
+    return Eye;
+  }
+  // C2 / comms
+  if (sub === 'sigint_intercept' || sub === 'rf_ping') return Satellite;
+  if (sub === 'comms_outage' || sub === 'jam_pulse' ||
+      sub === 'gps_denied_zone' || sub === 'position_report') {
+    return Radio;
+  }
+  // maneuver / smoke
+  if (sub === 'ground_advance' || sub === 'withdrawal' ||
+      sub === 'breach_attempt' || sub === 'defensive_consolidation' ||
+      sub === 'smoke_screen' || sub === 'terrain_obscuration') {
+    return Truck;
+  }
+  // logistics / lifecycle
+  if (sub === 'casevac_request' || sub === 'medevac_dispatched') return Heart;
+  // OSINT
+  if (sub === 'geotagged_social_post' || sub === 'report_link') return Globe;
+  return Database;
 }
 
 function objectName(object: AnyObject) {
