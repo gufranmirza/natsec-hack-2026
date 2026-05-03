@@ -80,7 +80,8 @@ func run() error {
 	// Mount the agent endpoints only if Azure OpenAI is configured. Missing
 	// credentials degrade to 503 on /operator/query rather than failing boot.
 	if azCfg, err := agent.AzureConfigFromEnv(); err == nil {
-		reasoner, err := agent.NewAzureReasoner(azCfg, log.Named("agent.azure"))
+		sqlRunner := agent.NewClickHouseSQLRunner(chConn.Pool())
+		reasoner, err := agent.NewAzureReasoner(azCfg, sqlRunner, log.Named("agent.azure"))
 		if err != nil {
 			log.Warn("agent: azure reasoner init failed; endpoints will return 503", zap.Error(err))
 		} else {
