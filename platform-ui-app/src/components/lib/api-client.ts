@@ -18,6 +18,11 @@ export async function apiClient<T>(
   let fullUrl = url;
   if (isServer) {
     fullUrl = `${process.env.PLATFORM_API_URL}${url}`;
+  } else if (process.env.NEXT_PUBLIC_PLATFORM_API_URL) {
+    // Browser-side calls go directly to the CP read API. Without this
+    // the URL stays relative and Next.js will look for /api/v1/... on
+    // its own dev server, where the route doesn't exist.
+    fullUrl = `${process.env.NEXT_PUBLIC_PLATFORM_API_URL}${url}`;
   }
 
   const headers: Record<string, string> = {
