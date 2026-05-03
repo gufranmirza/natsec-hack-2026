@@ -11,11 +11,12 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
+	"github.com/nsh-2026/platform-control-plane/internal/api/ingest"
+	"github.com/nsh-2026/platform-control-plane/internal/api/read"
+	"github.com/nsh-2026/platform-control-plane/internal/bus"
 	"github.com/nsh-2026/platform-control-plane/internal/clickhouse"
 	"github.com/nsh-2026/platform-control-plane/internal/config"
-	"github.com/nsh-2026/platform-control-plane/internal/devices"
 	"github.com/nsh-2026/platform-control-plane/internal/health"
-	"github.com/nsh-2026/platform-control-plane/internal/mission"
 	"github.com/nsh-2026/platform-control-plane/internal/ontology"
 	"github.com/nsh-2026/platform-control-plane/internal/server"
 )
@@ -63,11 +64,17 @@ func run() error {
 		return fmt.Errorf("ontology migrate: %w", err)
 	}
 
-	healthHandler := health.New(chConn, log.Named("health"))
-	deviceHandler := devices.New(log.Named("devices"))
-	missionStore := mission.NewStore()
-	missionHandler := mission.NewHandler(missionStore, log.Named("mission"))
-	router := server.NewRouter(healthHandler, deviceHandler, missionHandler, log)
+	store := ontology.New(chConn.Pool(), log.Named("ontology"))
+	changelogBus := bus.NewInMemory()
+
+	routes := server.Routes{
+		Health: health.New(chConn, log.Named("health")),
+		Ingest: ingest.New(store, changelogBus, log.Named("ingest")),
+		Read:   read.New(store, log.Named("read")),
+	}
+	cors := server.CORSConfig{AllowOrigin: os.Getenv("CORS_ALLOWED_ORIGIN")}
+	router := server.NewRouter(routes, cors, log)
+
 	srv := server.New(cfg.Server, router, log.Named("server"))
 	srv.Start()
 
