@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Brain,
   Database,
@@ -25,43 +25,76 @@ import {
 import { WorkspaceContextRail } from '@/components/_columns/workspace-context-rail';
 import { ObjectDrawer } from '@/components/_layout/object-drawer';
 import { OpStatusBar } from '@/components/_layout/op-status-bar';
-import {
-  ACTIVE_MISSION_ID,
-  ENTITIES,
-  EVENTS,
-  MISSIONS,
-  RECOMMENDATIONS,
-  REPORTS,
-  UNITS,
-} from '@/lib/fixtures';
+import { ACTIVE_MISSION_ID } from '@/lib/fixtures';
+import { useDemoData } from '@/services/cp/use-demo-data';
 import type {
   AnyObject,
   Entity,
   Event,
+  MissionObjective,
   Recommendation,
   Report,
   Unit,
 } from '@/types/ontology';
 
-interface VoiceRecognitionResult {
-  readonly results: {
-    readonly [index: number]: {
-      readonly [index: number]: { readonly transcript: string };
-    };
-  };
+interface VoiceRecognitionAlternative { readonly transcript: string; readonly confidence?: number; }
+interface VoiceRecognitionResultItem {
+  readonly isFinal: boolean;
+  readonly length: number;
+  readonly [index: number]: VoiceRecognitionAlternative;
 }
+interface VoiceRecognitionResult {
+  readonly resultIndex: number;
+  readonly results: { readonly length: number; readonly [index: number]: VoiceRecognitionResultItem };
+}
+interface VoiceRecognitionErrorEvent { readonly error: string; readonly message?: string; }
 
 interface VoiceRecognition {
   continuous: boolean;
   interimResults: boolean;
   lang: string;
+  onstart: (() => void) | null;
   onresult: ((event: VoiceRecognitionResult) => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((event: VoiceRecognitionErrorEvent) => void) | null;
   onend: (() => void) | null;
+  onnomatch: (() => void) | null;
   start: () => void;
+  stop: () => void;
+  abort: () => void;
 }
 
 type VoiceRecognitionCtor = new () => VoiceRecognition;
+
+// Base URL for the platform-control-plane HTTP API.
+// Default matches LISTEN_ADDR in platform-control-plane/.env (:8080).
+// Override via NEXT_PUBLIC_PLATFORM_API_URL at build time.
+const API_BASE =
+  (typeof process !== 'undefined' &&
+    process.env.NEXT_PUBLIC_PLATFORM_API_URL) ||
+  'http://localhost:8080';
+
+// Wire shape of POST /api/v1/operator/query responses (mirrors the Go
+// QueryResponse struct in internal/api/agent/handler.go). Recommendations
+// and Events come back as ontology Object handles ({ _type, _id, ... }).
+interface AgentQueryResponse {
+  query_id: string;
+  transcript: string;
+  intent: { type: string; confidence: number };
+  ai_response: { text: string };
+  recommendations: Recommendation[];
+  events: Event[];
+  generated_at: string;
+}
+
+const VOICE_ERROR_MESSAGES: Record<string, string> = {
+  'no-speech': 'No speech detected — tap and speak.',
+  'audio-capture': 'No microphone available.',
+  'not-allowed': 'Mic permission denied — enable in browser settings.',
+  'service-not-allowed': 'Speech service blocked.',
+  'network': 'Network error during recognition.',
+  'aborted': '',
+  'language-not-supported': 'en-US not available on this device.',
+};
 
 const WORKSPACES: Array<{
   id: WorkspaceSectionId;
@@ -96,17 +129,41 @@ const SOURCE_SHORT_LABELS: Record<DataSourceId, string> = {
   drone_video: 'drone video',
 };
 
+const FALLBACK_MISSION: MissionObjective = {
+  _type: 'MissionObjective',
+  _id: 'obj_unloaded',
+  _version: 0,
+  _source: 'fallback',
+  _source_ref: 'NO-MISSION',
+  _observed_at: new Date(0).toISOString(),
+  _ingested_at: new Date(0).toISOString(),
+  title: 'No mission loaded',
+  description: 'Mission fixtures are not available. Run the compile script.',
+  priority: 'P2',
+  status: 'open',
+};
+
 export function HomeView() {
+  // useDemoData branches on NEXT_PUBLIC_USE_LIVE_CP: live=false returns
+  // the static fixtures; live=true polls the cp/* TanStack Query hooks.
+  // The 6 ontology arrays seed local useState below so the existing
+  // optimistic-mutation paths (set*) keep working in fixture mode.
+  // In live mode, the hooks refetch on their own intervals and overwrite
+  // local state via the syncing effect below.
+  const seed = useDemoData();
+
   const [activeMissionId, setActiveMissionId] =
     useState<string>(ACTIVE_MISSION_ID);
   const [workspace, setWorkspace] = useState<WorkspaceSectionId>('awareness');
-  const [entities, setEntities] = useState<Entity[]>(ENTITIES);
-  const [units, setUnits] = useState<Unit[]>(UNITS);
-  const [events, setEvents] = useState<Event[]>(EVENTS);
-  const [reports, setReports] = useState<Report[]>(REPORTS);
+  const [entities, setEntities] = useState<Entity[]>(seed.entities);
+  const [units, setUnits] = useState<Unit[]>(seed.units);
+  const [events, setEvents] = useState<Event[]>(seed.events);
+  const [reports, setReports] = useState<Report[]>(seed.reports);
   const [recommendations, setRecommendations] =
-    useState<Recommendation[]>(RECOMMENDATIONS);
-  const [selected, setSelected] = useState<AnyObject | null>(ENTITIES[0]);
+    useState<Recommendation[]>(seed.recommendations);
+  const [selected, setSelected] = useState<AnyObject | null>(
+    seed.entities[0] ?? null,
+  );
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [voiceArmed, setVoiceArmed] = useState(false);
@@ -121,7 +178,32 @@ export function HomeView() {
   const [now, setNow] = useState(() => new Date());
 
   const activeMission =
-    MISSIONS.find((m) => m._id === activeMissionId) ?? MISSIONS[0];
+    seed.missions.find((m) => m._id === activeMissionId) ??
+    seed.missions[0] ??
+    FALLBACK_MISSION;
+
+  // Live-mode sync: when the cp/* hooks return new data on their poll
+  // intervals, mirror it into local state so existing render code is
+  // unchanged. In fixture mode `seed.*` references are stable so these
+  // effects fire once on mount and never again. Local optimistic
+  // mutations (set*) get overwritten on the next refetch — acceptable
+  // for v1 since the live demo is replayer-driven, not user-mutation
+  // driven.
+  useEffect(() => {
+    if (seed.live) setEntities(seed.entities);
+  }, [seed.live, seed.entities]);
+  useEffect(() => {
+    if (seed.live) setUnits(seed.units);
+  }, [seed.live, seed.units]);
+  useEffect(() => {
+    if (seed.live) setEvents(seed.events);
+  }, [seed.live, seed.events]);
+  useEffect(() => {
+    if (seed.live) setReports(seed.reports);
+  }, [seed.live, seed.reports]);
+  useEffect(() => {
+    if (seed.live) setRecommendations(seed.recommendations);
+  }, [seed.live, seed.recommendations]);
   const missionElapsed = useMemo(
     () => formatElapsed(activeMission._observed_at, now),
     [activeMission._observed_at, now]
@@ -132,6 +214,31 @@ export function HomeView() {
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    const DEMO_TIME_SCALE = 25;
+    const TICK_MS = 1000;
+    const id = window.setInterval(() => {
+      setUnits((current) =>
+        current.map((unit) => {
+          if (unit._subtype !== 'drone') return unit;
+          const speed = unit.speed_mps ?? 0;
+          if (speed <= 0) return unit;
+          const heading = unit.heading_deg ?? 0;
+          const meters = speed * (TICK_MS / 1000) * DEMO_TIME_SCALE;
+          const dLat = (meters * Math.cos((heading * Math.PI) / 180)) / 111000;
+          const dLon =
+            (meters * Math.sin((heading * Math.PI) / 180)) /
+            (111000 * Math.cos((unit.position[0] * Math.PI) / 180));
+          return {
+            ...unit,
+            position: [unit.position[0] + dLat, unit.position[1] + dLon],
+          };
+        })
+      );
+    }, TICK_MS);
     return () => window.clearInterval(id);
   }, []);
 
@@ -629,62 +736,121 @@ export function HomeView() {
     setWorkspace('awareness');
   }, []);
 
+  // Server-mediated query — the operator's transcript goes to the CP, which
+  // calls Azure OpenAI gpt-4o with the full mission context and returns
+  // typed Recommendation + Event objects. UI just renders what CP hands back.
+  // Returns the spoken response text (or null on failure) so secondary
+  // surfaces — the copilot chat panel — can render the same answer inline.
   const submitMissionQuery = useCallback(
-    (rawQuery: string, fromVoice = false) => {
+    async (rawQuery: string, fromVoice = false): Promise<string | null> => {
       const trimmed = rawQuery.trim();
-      if (!trimmed) return;
-
-      const lower = trimmed.toLowerCase();
-      const answer = buildMissionAnswer(trimmed, fromVoice);
-      if (lower.includes('swarm')) {
-        handleLaunchSwarm();
-      } else if (
-        lower.includes('launch') &&
-        (lower.includes('drone') || lower.includes('rook'))
-      ) {
-        handleLaunchDrone('unit_rook1');
-      } else if (lower.includes('fuse') || lower.includes('data')) {
-        setWorkspace('integrations');
-      } else if (lower.includes('plan') || lower.includes('coa')) {
-        handleGeneratePlan();
-      } else {
-        setWorkspace('intelligence');
-      }
-
-      appendEvent({
-        _id: `evt_query_${Date.now()}`,
-        _observed_at: new Date().toISOString(),
-        _ingested_at: new Date().toISOString(),
-        _source: fromVoice ? 'voice-query' : 'natural-language-query',
-        _subtype: 'report_link',
-        severity: 'info',
-        description: `Commander query answered across ${units.length} units, ${reports.length} reports, ${events.length} events, DeepState terrain, and live recommendations: "${trimmed}"`,
-        payload: {
-          query: trimmed,
-          voice: fromVoice,
-          sources: [
-            'drones',
-            'radio',
-            'satellite',
-            'intel',
-            'osint',
-            'DeepState',
-          ],
-        },
-        verb: 'Answered.',
-      });
-      setAiAnswer(answer);
+      if (!trimmed) return null;
       setVoiceTranscript(trimmed);
+
+      // The agent now reads live state from ClickHouse directly (see
+      // platform-control-plane/internal/api/agent/azure.go — it generates
+      // SQL via the data catalog). UI ships only the transcript + minimal
+      // hints (which drone the operator is looking at, which workspace).
+      // No more units/events/entities/recs — they were causing 400s on
+      // wire-shape mismatch and were redundant with the SQL path.
+      const body = {
+        transcript: trimmed,
+        source: fromVoice ? 'voice' : 'text',
+        mission_id: activeMission._id,
+        ui_context: {
+          active_drone_feed: activeDroneFeed ?? '',
+          workspace,
+        },
+      };
+
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/operator/query`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+
+        if (!res.ok) {
+          const message =
+            res.status === 503
+              ? 'Mission Commander agent disabled — Azure OpenAI not configured on the control plane.'
+              : `Control plane returned ${res.status}.`;
+          setAiAnswer({
+            query: trimmed,
+            response: message,
+            sources: ['platform-control-plane'],
+            actions: [],
+            generatedAt: new Date().toISOString(),
+            fromVoice,
+          });
+          return message;
+        }
+
+        const data: AgentQueryResponse = await res.json();
+
+        if (data.recommendations?.length) {
+          setRecommendations((current) => [
+            ...(data.recommendations as Recommendation[]),
+            ...current,
+          ]);
+        }
+        if (data.events?.length) {
+          for (const e of data.events) appendEvent(e as Event);
+        }
+
+        setAiAnswer({
+          query: trimmed,
+          response: data.ai_response.text,
+          sources: ['Mission Commander · Azure OpenAI gpt-4o'],
+          actions: (data.recommendations ?? []).map(
+            (r) => r.proposed_action_type
+          ),
+          generatedAt: data.generated_at,
+          fromVoice,
+        });
+
+        // Spoken response — only on voice queries, browser TTS, fire-and-forget.
+        if (
+          fromVoice &&
+          typeof window !== 'undefined' &&
+          'speechSynthesis' in window &&
+          data.ai_response.text
+        ) {
+          try {
+            window.speechSynthesis.cancel();
+            const utt = new SpeechSynthesisUtterance(data.ai_response.text);
+            utt.lang = 'en-US';
+            utt.rate = 1.05;
+            utt.pitch = 1.0;
+            window.speechSynthesis.speak(utt);
+          } catch {
+            /* TTS is optional — never throw on voice playback */
+          }
+        }
+        return data.ai_response.text ?? null;
+      } catch {
+        const message =
+          'Cannot reach Mission Commander control plane. Start the platform-control-plane and retry.';
+        setAiAnswer({
+          query: trimmed,
+          response: message,
+          sources: ['platform-control-plane'],
+          actions: [],
+          generatedAt: new Date().toISOString(),
+          fromVoice,
+        });
+        return message;
+      }
     },
     [
+      activeMission._id,
+      activeDroneFeed,
+      workspace,
+      units,
+      events,
+      entities,
+      recommendations,
       appendEvent,
-      buildMissionAnswer,
-      events.length,
-      handleGeneratePlan,
-      handleLaunchDrone,
-      handleLaunchSwarm,
-      reports.length,
-      units.length,
     ]
   );
 
@@ -697,48 +863,110 @@ export function HomeView() {
     [query, submitMissionQuery, voiceArmed]
   );
 
-  const handleVoiceCommand = useCallback(() => {
-    setVoiceArmed(true);
+  const recognitionRef = useRef<VoiceRecognition | null>(null);
+  const voiceListeningRef = useRef(false);
+  voiceListeningRef.current = voiceListening;
+
+  // Build the singleton recognition lazily, once per session.
+  const ensureRecognition = useCallback((): VoiceRecognition | null => {
+    if (recognitionRef.current) return recognitionRef.current;
+    if (typeof window === 'undefined') return null;
     const speechWindow = window as unknown as {
       SpeechRecognition?: VoiceRecognitionCtor;
       webkitSpeechRecognition?: VoiceRecognitionCtor;
     };
     const Recognition =
       speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
+    if (!Recognition) return null;
 
-    if (!Recognition) {
-      const fallback =
-        'Give me an update on everything that happened last 10 minutes';
+    const r = new Recognition();
+    r.continuous = false;
+    r.interimResults = true;       // show partials so the operator sees the system listening
+    r.lang = 'en-US';
+    recognitionRef.current = r;
+    return r;
+  }, []);
+
+  const handleVoiceCommand = useCallback(() => {
+    // Toggle: tap-while-listening = abort current capture.
+    if (voiceListeningRef.current && recognitionRef.current) {
+      try { recognitionRef.current.abort(); } catch { /* noop */ }
+      setVoiceListening(false);
+      setVoiceTranscript('Cancelled.');
+      return;
+    }
+
+    setVoiceArmed(true);
+    const recognition = ensureRecognition();
+
+    if (!recognition) {
+      // No browser support — keep the demo flowing with a canned query.
+      const fallback = 'Give me an update on everything that happened last 10 minutes';
       setVoiceTranscript(fallback);
       submitMissionQuery(fallback, true);
       return;
     }
 
-    const recognition = new Recognition();
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.lang = 'en-US';
+    // Bind handlers fresh every time so they close over current callbacks.
+    recognition.onstart = () => {
+      setVoiceListening(true);
+      setVoiceTranscript('Listening…');
+    };
     recognition.onresult = (event) => {
-      const transcript = event.results[0]?.[0]?.transcript ?? '';
-      if (transcript) {
-        setVoiceTranscript(transcript);
-        setQuery(transcript);
-        submitMissionQuery(transcript, true);
+      let finalText = '';
+      let interim = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const r = event.results[i];
+        const txt = r?.[0]?.transcript ?? '';
+        if (r?.isFinal) finalText += txt;
+        else interim += txt;
+      }
+      if (finalText) {
+        const trimmed = finalText.trim();
+        setVoiceTranscript(trimmed);
+        setQuery(trimmed);
+        submitMissionQuery(trimmed, true);
+      } else if (interim) {
+        setVoiceTranscript(interim.trim() + '…');
       }
     };
-    recognition.onerror = () => {
+    recognition.onerror = (event) => {
       setVoiceListening(false);
-      setVoiceTranscript('Voice capture failed. Try: launch ROOK-1.');
+      const msg = VOICE_ERROR_MESSAGES[event.error] ?? `Voice error: ${event.error}`;
+      if (msg) setVoiceTranscript(msg);
     };
-    recognition.onend = () => setVoiceListening(false);
-    setVoiceListening(true);
-    recognition.start();
-  }, [submitMissionQuery]);
+    recognition.onnomatch = () => {
+      setVoiceTranscript('Did not catch that — try again.');
+    };
+    recognition.onend = () => {
+      setVoiceListening(false);
+    };
+
+    try {
+      recognition.start();
+    } catch {
+      // start() throws InvalidStateError if already running — abort and retry next tick.
+      try { recognition.abort(); } catch { /* noop */ }
+      setVoiceListening(false);
+      window.setTimeout(() => {
+        try { recognition.start(); } catch { /* noop */ }
+      }, 120);
+    }
+  }, [ensureRecognition, submitMissionQuery]);
+
+  // Clean up the recognition session if the page unmounts mid-listen.
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try { recognitionRef.current.abort(); } catch { /* noop */ }
+      }
+    };
+  }, []);
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       <OpStatusBar
-        missions={MISSIONS}
+        missions={seed.missions}
         activeId={activeMissionId}
         onMissionSelect={setActiveMissionId}
         missionId={activeMission._source_ref ?? activeMission._id}
@@ -860,6 +1088,7 @@ export function HomeView() {
             entities={isLiveTab ? entities : []}
             events={isLiveTab ? events : []}
             reports={isLiveTab ? reports : []}
+            recommendations={isLiveTab ? recommendations : []}
             selectedId={selected?._id}
             onSelect={handleSelect}
             onLaunchDrone={handleLaunchDrone}
@@ -874,7 +1103,7 @@ export function HomeView() {
           <WorkspaceCenter
             workspace={workspace}
             objective={activeMission}
-            missions={MISSIONS}
+            missions={seed.missions}
             activeMissionId={activeMissionId}
             entities={isLiveTab ? entities : []}
             units={isLiveTab ? units : []}
@@ -913,6 +1142,9 @@ export function HomeView() {
             onApprove={handleApproveRecommendation}
             onReject={handleRejectRecommendation}
             onModify={handleModifyRecommendation}
+            onAskCopilot={(text) => submitMissionQuery(text, false)}
+            onVoiceCommand={handleVoiceCommand}
+            voiceListening={voiceListening}
           />
         </div>
       </main>
