@@ -9,7 +9,7 @@ export const UNITS: Unit[] = [
     _source: "sim:silent-eye-20260502",
     _source_ref: "unit_blue_medical_t+15",
     _observed_at: "2026-05-02T08:20:30.000Z",
-    _subtype: "vehicle",
+    _subtype: "vehicle_medical",
     callsign: "LAZARUS",
     position: [
       48.63,
@@ -29,7 +29,7 @@ export const UNITS: Unit[] = [
     _source: "sim:silent-eye-20260502",
     _source_ref: "unit_rook2_t-23",
     _observed_at: "2026-05-02T07:42:30.000Z",
-    _subtype: "drone",
+    _subtype: "drone_isr",
     callsign: "ROOK-2",
     position: [
       48.55,
@@ -55,7 +55,7 @@ export const UNITS: Unit[] = [
     _source: "sim:silent-eye-20260502",
     _source_ref: "unit_blue_uas_falcon1_t-25",
     _observed_at: "2026-05-02T07:40:00.000Z",
-    _subtype: "drone",
+    _subtype: "drone_strike",
     callsign: "FALCON-1",
     position: [
       48.74,
@@ -83,7 +83,7 @@ export const UNITS: Unit[] = [
     _source: "sim:silent-eye-20260502",
     _source_ref: "unit_rook1_t-30",
     _observed_at: "2026-05-02T07:35:30.000Z",
-    _subtype: "drone",
+    _subtype: "drone_isr",
     callsign: "ROOK-1",
     position: [
       48.78,
@@ -132,7 +132,7 @@ export const UNITS: Unit[] = [
     _source: "sim:silent-eye-20260502",
     _source_ref: "unit_blue_mech_pl1",
     _observed_at: "2026-05-02T06:25:00.000Z",
-    _subtype: "vehicle",
+    _subtype: "vehicle_mech",
     callsign: "PUNISHER-1",
     position: [
       48.6,
@@ -157,7 +157,7 @@ export const UNITS: Unit[] = [
     _source: "sim:silent-eye-20260502",
     _source_ref: "unit_blue_recon_team1",
     _observed_at: "2026-05-02T06:25:00.000Z",
-    _subtype: "vehicle",
+    _subtype: "vehicle_recon",
     callsign: "SCOUT-1",
     position: [
       48.58,
@@ -181,7 +181,7 @@ export const UNITS: Unit[] = [
     _source: "sim:silent-eye-20260502",
     _source_ref: "unit_blue_recon_team2",
     _observed_at: "2026-05-02T06:25:00.000Z",
-    _subtype: "infantry",
+    _subtype: "infantry_recon",
     callsign: "SCOUT-2",
     position: [
       48.57,
@@ -202,7 +202,7 @@ export const UNITS: Unit[] = [
     _source: "sim:silent-eye-20260502",
     _source_ref: "unit_blue_fpv_team",
     _observed_at: "2026-05-02T06:25:00.000Z",
-    _subtype: "infantry",
+    _subtype: "infantry_kinetic",
     callsign: "HORNET",
     position: [
       48.61,
@@ -223,7 +223,7 @@ export const UNITS: Unit[] = [
     _source: "sim:silent-eye-20260502",
     _source_ref: "unit_blue_himars_pair",
     _observed_at: "2026-05-02T06:25:00.000Z",
-    _subtype: "vehicle",
+    _subtype: "vehicle_himars",
     callsign: "LIGHTNING",
     position: [
       48.6,
@@ -244,7 +244,7 @@ export const UNITS: Unit[] = [
     _source: "sim:silent-eye-20260502",
     _source_ref: "unit_bravo3",
     _observed_at: "2026-05-02T06:25:00.000Z",
-    _subtype: "infantry",
+    _subtype: "infantry_team",
     callsign: "BRAVO-3",
     position: [
       48.66,

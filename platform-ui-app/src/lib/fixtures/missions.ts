@@ -44,27 +44,27 @@ export const MISSIONS: MissionObjective[] = [
     _id: "obj_night_eagle",
     _source: "sim:silent-eye-20260502",
     _source_ref: "obj_night_eagle",
-    _observed_at: "2026-05-02T05:00:00.000Z",
+    _observed_at: "2026-05-02T06:25:00.000Z",
     title: "OP NIGHT EAGLE",
     description: "Long-range ISR over Sea of Azov coastal approach sector D-7. Hand-off to JADE-2 at 1800Z relief. Placeholder tab for v1 demo, no live data.",
     priority: "P2",
     deadline: "2026-05-02T22:00:00.000Z",
     status: "open",
     _version: 1,
-    _ingested_at: "2026-05-02T05:00:00.000Z"
+    _ingested_at: "2026-05-02T06:25:00.000Z"
   },
   {
     _type: "MissionObjective",
     _id: "obj_red_horizon",
     _source: "sim:silent-eye-20260502",
     _source_ref: "obj_red_horizon",
-    _observed_at: "2026-05-02T01:00:00.000Z",
+    _observed_at: "2026-05-02T06:25:00.000Z",
     title: "OP RED HORIZON",
     description: "Search-and-rescue handoff complete. Awaiting after-action review. Placeholder tab for v1 demo, no live data.",
     priority: "P0",
     status: "completed",
     _version: 1,
-    _ingested_at: "2026-05-02T01:00:00.000Z"
+    _ingested_at: "2026-05-02T06:25:00.000Z"
   }
 ];
 
