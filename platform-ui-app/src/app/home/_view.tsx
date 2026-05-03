@@ -1090,7 +1090,7 @@ export function HomeView() {
         <WorkspaceRail active={workspace} onSelect={setWorkspace} />
 
         {/* LEFT — orient (status surfaces, objective at top) */}
-        <div className="order-2 min-h-[430px] overflow-hidden lg:order-1 lg:min-h-0">
+        <div className="order-2 min-h-[520px] overflow-hidden lg:order-1 lg:h-full lg:min-h-0">
           <ColStatus
             workspace={workspace}
             objective={activeMission}
@@ -1109,7 +1109,7 @@ export function HomeView() {
         </div>
 
         {/* CENTER — observe (map, the hero) */}
-        <div className="order-1 min-h-[480px] overflow-hidden lg:order-2 lg:min-h-0">
+        <div className="order-1 min-h-[520px] overflow-hidden lg:order-2 lg:h-full lg:min-h-0">
           <WorkspaceCenter
             workspace={workspace}
             objective={activeMission}
@@ -1138,7 +1138,7 @@ export function HomeView() {
         </div>
 
         {/* RIGHT — decide + act (copilot) */}
-        <div className="order-3 min-h-[560px] overflow-hidden lg:min-h-0">
+        <div className="order-3 min-h-[520px] overflow-hidden lg:h-full lg:min-h-0">
           <WorkspaceContextRail
             workspace={workspace}
             entities={isLiveTab ? entities : []}
