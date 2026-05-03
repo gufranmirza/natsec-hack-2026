@@ -30,6 +30,7 @@ import {
 
 import { ColMap } from '@/components/_columns/col-map';
 import type { WorkspaceSectionId } from '@/components/_columns/col-status';
+import { buildAiSuggestions } from '@/lib/ai-suggestions';
 import type {
   AnyObject,
   Entity,
@@ -902,6 +903,10 @@ function IntelligenceSurface({
     reports.length +
     events.length +
     recommendations.length;
+  const suggestions = buildAiSuggestions(
+    { entities, units, events, reports, recommendations },
+    6
+  );
   return (
     <section className="bg-background flex h-full min-h-0 flex-col overflow-hidden">
       <SurfaceHeader
@@ -913,26 +918,29 @@ function IntelligenceSurface({
       <div className="bg-border grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_320px] gap-px">
         <div className="bg-card min-h-0 overflow-y-auto p-5">
           <div className="border-border bg-background border p-4">
-            <div className="mb-3 flex items-center gap-2">
-              <Search className="text-primary size-4" />
-              <span className="text-foreground font-mono text-[12px] font-bold">
-                Mission-wide query examples
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Search className="text-primary size-4" />
+                <span className="text-foreground font-mono text-[12px] font-bold">
+                  Mission-grounded queries
+                </span>
+              </div>
+              <span className="text-muted-foreground font-mono text-[10px]">
+                derived from {corpus} indexed objects
               </span>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              {[
-                'Give me an update on the last 10 minutes',
-                'What evidence supports launching ROOK-1?',
-                'Summarize unresolved objects and confidence',
-                'What changes if cloud comms drop?',
-              ].map((prompt) => (
+              {suggestions.map((s) => (
                 <button
-                  key={prompt}
+                  key={s.id}
                   type="button"
-                  onClick={() => onAsk(prompt)}
-                  className="border-border bg-card text-foreground hover:bg-secondary border px-3 py-2 text-left text-[12px]"
+                  onClick={() => onAsk(s.prompt)}
+                  className="border-border bg-card text-foreground hover:bg-secondary group relative border px-3 py-2 text-left text-[12px]"
                 >
-                  {prompt}
+                  <span className="text-muted-foreground/80 mb-0.5 block font-mono text-[9px] uppercase">
+                    {s.category}
+                  </span>
+                  {s.prompt}
                 </button>
               ))}
             </div>
@@ -1184,17 +1192,17 @@ function SurfaceHeader({
   meta: string;
 }) {
   return (
-    <header className="border-border bg-card flex shrink-0 items-center justify-between border-b px-4 py-3">
-      <div className="flex min-w-0 items-center gap-3">
-        <Icon className="text-primary size-5 shrink-0" />
+    <header className="border-border bg-card flex shrink-0 items-center justify-between gap-3 border-b px-3 py-2">
+      <div className="flex min-w-0 items-center gap-2">
+        <Icon className="text-primary size-4 shrink-0" />
         <div className="min-w-0">
           <div className="label-cap-sm text-muted-foreground">{eyebrow}</div>
-          <h1 className="text-foreground truncate font-mono text-[15px] font-bold">
+          <div className="text-foreground truncate font-mono text-[12px] font-bold">
             {title}
-          </h1>
+          </div>
         </div>
       </div>
-      <span className="text-muted-foreground font-mono text-[10px]">
+      <span className="text-muted-foreground shrink-0 font-mono text-[10px]">
         {meta}
       </span>
     </header>
