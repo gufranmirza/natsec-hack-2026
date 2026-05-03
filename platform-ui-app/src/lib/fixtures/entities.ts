@@ -82,6 +82,34 @@ export const ENTITIES: Entity[] = [
   },
   {
     _type: "Entity",
+    _id: "ent_civ_air_03",
+    _source: "feed:opensky",
+    _source_ref: "4ca91d",
+    _observed_at: "2026-05-02T08:05:00.000Z",
+    _subtype: "Aircraft",
+    affiliation: "neutral",
+    name: "WZZ887",
+    position: [
+      48.15,
+      38
+    ],
+    altitude_m: 11500,
+    heading_deg: 95,
+    speed_mps: 248,
+    confidence: 0.99,
+    threat_level: "none",
+    attributes: {
+      icao24: "4ca91d",
+      callsign: "WZZ887",
+      class: "Airbus A321",
+      platform_role: "civilian airliner",
+      kind: "civilian"
+    },
+    _version: 1,
+    _ingested_at: "2026-05-02T08:05:00.000Z"
+  },
+  {
+    _type: "Entity",
     _id: "ent_red_engineer_01",
     _source: "sim:silent-eye-20260502",
     _source_ref: "ent_red_engineer_01",
@@ -277,6 +305,36 @@ export const ENTITIES: Entity[] = [
   },
   {
     _type: "Entity",
+    _id: "ent_red_su34",
+    _source: "feed:opensky",
+    _source_ref: "5141b7",
+    _observed_at: "2026-05-02T07:38:00.000Z",
+    _subtype: "Aircraft",
+    affiliation: "hostile",
+    name: "RED-SU34",
+    position: [
+      48.95,
+      38.2
+    ],
+    altitude_m: 4500,
+    heading_deg: 250,
+    speed_mps: 180,
+    confidence: 0.79,
+    threat_level: "high",
+    attributes: {
+      icao24: "5141b7",
+      callsign: "squawk-deactivated",
+      class: "Su-34",
+      platform_role: "Russian fighter-bomber, UMPK glide-bomb sortie",
+      operator: "VKS",
+      weapon: "FAB-500M-62 with UMPK kit",
+      kind: "ru_strike"
+    },
+    _version: 1,
+    _ingested_at: "2026-05-02T07:38:00.000Z"
+  },
+  {
+    _type: "Entity",
     _id: "ent_civ_truck_01",
     _source: "sim:silent-eye-20260502",
     _source_ref: "ent_civ_truck_01_moving",
@@ -299,6 +357,34 @@ export const ENTITIES: Entity[] = [
     },
     _version: 1,
     _ingested_at: "2026-05-02T07:25:00.000Z"
+  },
+  {
+    _type: "Entity",
+    _id: "ent_civ_air_02",
+    _source: "feed:opensky",
+    _source_ref: "7c6b8a",
+    _observed_at: "2026-05-02T07:00:00.000Z",
+    _subtype: "Aircraft",
+    affiliation: "neutral",
+    name: "LOT-115",
+    position: [
+      48.2,
+      37.9
+    ],
+    altitude_m: 12500,
+    heading_deg: 85,
+    speed_mps: 255,
+    confidence: 0.99,
+    threat_level: "none",
+    attributes: {
+      icao24: "7c6b8a",
+      callsign: "LOT115",
+      class: "Boeing 737-800",
+      platform_role: "civilian airliner",
+      kind: "civilian"
+    },
+    _version: 1,
+    _ingested_at: "2026-05-02T07:00:00.000Z"
   },
   {
     _type: "Entity",
@@ -402,6 +488,66 @@ export const ENTITIES: Entity[] = [
       class: "civilian airliner",
       platform_role: "FL370 transit",
       ads_b_squawk: "6712"
+    },
+    _version: 1,
+    _ingested_at: "2026-05-02T06:25:00.000Z"
+  },
+  {
+    _type: "Entity",
+    _id: "ent_nato_isr_rc135",
+    _source: "feed:opensky",
+    _source_ref: "ae1146",
+    _observed_at: "2026-05-02T06:25:00.000Z",
+    _subtype: "Aircraft",
+    affiliation: "friendly",
+    name: "JAKE21",
+    position: [
+      49.2,
+      24
+    ],
+    altitude_m: 11000,
+    heading_deg: 90,
+    speed_mps: 230,
+    confidence: 0.99,
+    threat_level: "none",
+    attributes: {
+      icao24: "ae1146",
+      callsign: "JAKE21",
+      class: "RC-135V Rivet Joint",
+      platform_role: "NATO standoff SIGINT",
+      operator: "USAF",
+      loiter_pattern: "figure-8 over Polish airspace",
+      kind: "nato_isr"
+    },
+    _version: 1,
+    _ingested_at: "2026-05-02T06:25:00.000Z"
+  },
+  {
+    _type: "Entity",
+    _id: "ent_nato_isr_rq4b",
+    _source: "feed:opensky",
+    _source_ref: "ae5b21",
+    _observed_at: "2026-05-02T06:25:00.000Z",
+    _subtype: "Aircraft",
+    affiliation: "friendly",
+    name: "FORTE10",
+    position: [
+      49.5,
+      25.4
+    ],
+    altitude_m: 17000,
+    heading_deg: 120,
+    speed_mps: 180,
+    confidence: 0.99,
+    threat_level: "none",
+    attributes: {
+      icao24: "ae5b21",
+      callsign: "FORTE10",
+      class: "RQ-4B Global Hawk",
+      platform_role: "NATO HALE ISR",
+      operator: "USAF",
+      loiter_pattern: "FL550 racetrack over Romania",
+      kind: "nato_isr"
     },
     _version: 1,
     _ingested_at: "2026-05-02T06:25:00.000Z"

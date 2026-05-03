@@ -106,6 +106,30 @@ export const EVENTS: Event[] = [
   },
   {
     _type: "Event",
+    _id: "evt_thermal_007",
+    _source: "sim:silent-eye-20260502",
+    _source_ref: "evt_thermal_007",
+    _observed_at: "2026-05-02T08:17:30.000Z",
+    _subtype: "thermal_signature",
+    entity_id: "ent_red_dismount_03",
+    unit_id: "unit_rook1",
+    position: [
+      48.74,
+      37.94
+    ],
+    severity: "info",
+    description: "ROOK-1 IR: warm cluster of ~6 personnel near RED-ARMOR-1 wreck. Recovery activity confirmed via thermal vs visual cross-check.",
+    verb: "Detected.",
+    payload: {
+      sensor: "rook1_ir",
+      cluster_size: 6,
+      signature: "warm_personnel"
+    },
+    _version: 1,
+    _ingested_at: "2026-05-02T08:17:30.000Z"
+  },
+  {
+    _type: "Event",
     _id: "evt_phase8_007",
     _source: "sim:silent-eye-20260502",
     _source_ref: "evt_phase8_007",
@@ -149,6 +173,31 @@ export const EVENTS: Event[] = [
     },
     _version: 1,
     _ingested_at: "2026-05-02T08:15:00.000Z"
+  },
+  {
+    _type: "Event",
+    _id: "evt_thermal_006",
+    _source: "sim:silent-eye-20260502",
+    _source_ref: "evt_thermal_006",
+    _observed_at: "2026-05-02T08:14:30.000Z",
+    _subtype: "thermal_signature",
+    entity_id: "ent_red_assault_co_01",
+    unit_id: "unit_blue_uas_falcon1",
+    position: [
+      48.74,
+      37.92
+    ],
+    severity: "warn",
+    description: "FALCON-1 IR: 4 hot-spots from FPV strikes on BTR-82A column. 2 burning, 2 immobilized but not burning.",
+    verb: "Detected.",
+    payload: {
+      sensor: "falcon1_ir",
+      cluster_size: 4,
+      burning: 2,
+      immobilized: 2
+    },
+    _version: 1,
+    _ingested_at: "2026-05-02T08:14:30.000Z"
   },
   {
     _type: "Event",
@@ -216,6 +265,32 @@ export const EVENTS: Event[] = [
       weapon: "fpv_one_way_attack",
       attack_profile: "top_attack",
       cope_cage_outcome: "failure"
+    },
+    _version: 1,
+    _ingested_at: "2026-05-02T08:12:30.000Z"
+  },
+  {
+    _type: "Event",
+    _id: "evt_thermal_005",
+    _source: "feed:firms-viirs",
+    _source_ref: "evt_thermal_005",
+    _observed_at: "2026-05-02T08:12:30.000Z",
+    _subtype: "thermal_signature",
+    entity_id: "ent_red_arty_battery_01",
+    position: [
+      48.65,
+      38.03
+    ],
+    severity: "critical",
+    description: "FIRMS VIIRS post-HIMARS: 9 thermal anomalies clustered at RED-BAT-7 grid. Brightness 412K, total FRP 156 MW. Consistent with battery-level destruction (3 of 4 SPHs).",
+    verb: "Detected.",
+    payload: {
+      satellite: "Aqua",
+      brightness_k: 412,
+      frp_mw: 156,
+      confidence: "high",
+      cluster_size: 9,
+      corroborates: "evt_phase8_002"
     },
     _version: 1,
     _ingested_at: "2026-05-02T08:12:30.000Z"
@@ -361,6 +436,31 @@ export const EVENTS: Event[] = [
   },
   {
     _type: "Event",
+    _id: "evt_thermal_004",
+    _source: "sim:silent-eye-20260502",
+    _source_ref: "evt_thermal_004",
+    _observed_at: "2026-05-02T08:06:15.000Z",
+    _subtype: "thermal_signature",
+    entity_id: "ent_red_armor_01",
+    unit_id: "unit_rook1",
+    position: [
+      48.74,
+      37.94
+    ],
+    severity: "critical",
+    description: "ROOK-1 IR: T-72B3 hot-spot persistent for 90s after FPV strike. Engine compartment sustained burn; consistent with mobility kill + secondary fire.",
+    verb: "Detected.",
+    payload: {
+      sensor: "rook1_ir",
+      brightness_k: 398,
+      frp_mw: 52.1,
+      persistence_s: 90
+    },
+    _version: 1,
+    _ingested_at: "2026-05-02T08:06:15.000Z"
+  },
+  {
+    _type: "Event",
     _id: "evt_phase7_002",
     _source: "sim:silent-eye-20260502",
     _source_ref: "evt_phase7_002",
@@ -407,6 +507,31 @@ export const EVENTS: Event[] = [
     },
     _version: 1,
     _ingested_at: "2026-05-02T08:05:30.000Z"
+  },
+  {
+    _type: "Event",
+    _id: "evt_thermal_003",
+    _source: "sim:silent-eye-20260502",
+    _source_ref: "evt_thermal_003",
+    _observed_at: "2026-05-02T08:04:30.000Z",
+    _subtype: "thermal_signature",
+    entity_id: "ent_red_engineer_01",
+    unit_id: "unit_blue_uas_falcon1",
+    position: [
+      48.71,
+      37.86
+    ],
+    severity: "critical",
+    description: "FALCON-1 IR: massive thermal flash from UR-77 secondary explosion, brightness 421K, 12 detections in 30s. Confirms catastrophic kill on engineer breach element.",
+    verb: "Detected.",
+    payload: {
+      sensor: "falcon1_ir",
+      brightness_k: 421,
+      frp_mw: 89.2,
+      detection_count: 12
+    },
+    _version: 1,
+    _ingested_at: "2026-05-02T08:04:30.000Z"
   },
   {
     _type: "Event",
@@ -668,6 +793,31 @@ export const EVENTS: Event[] = [
   },
   {
     _type: "Event",
+    _id: "evt_thermal_002",
+    _source: "feed:firms-viirs",
+    _source_ref: "evt_thermal_002",
+    _observed_at: "2026-05-02T07:46:30.000Z",
+    _subtype: "thermal_signature",
+    entity_id: "ent_red_arty_battery_01",
+    position: [
+      48.6,
+      37.798
+    ],
+    severity: "warn",
+    description: "FIRMS VIIRS thermal anomaly: brightness 381K, FRP 34.0 MW. Six secondary detections in same grid square within 90s.",
+    verb: "Detected.",
+    payload: {
+      satellite: "NOAA-20",
+      brightness_k: 381,
+      frp_mw: 34,
+      confidence: "high",
+      cluster_size: 6
+    },
+    _version: 1,
+    _ingested_at: "2026-05-02T07:46:30.000Z"
+  },
+  {
+    _type: "Event",
     _id: "evt_phase5_005",
     _source: "sim:silent-eye-20260502",
     _source_ref: "evt_phase5_005",
@@ -690,6 +840,31 @@ export const EVENTS: Event[] = [
     },
     _version: 1,
     _ingested_at: "2026-05-02T07:46:00.000Z"
+  },
+  {
+    _type: "Event",
+    _id: "evt_thermal_001",
+    _source: "feed:firms-viirs",
+    _source_ref: "evt_thermal_001",
+    _observed_at: "2026-05-02T07:45:30.000Z",
+    _subtype: "thermal_signature",
+    entity_id: "ent_red_arty_battery_01",
+    position: [
+      48.601,
+      37.795
+    ],
+    severity: "warn",
+    description: "FIRMS VIIRS thermal anomaly cluster at PUNISHER-1 line: brightness 367K, FRP 28.4 MW. Consistent with 152mm impact heat signatures.",
+    verb: "Detected.",
+    payload: {
+      satellite: "NOAA-20",
+      brightness_k: 367,
+      frp_mw: 28.4,
+      confidence: "high",
+      cluster_size: 4
+    },
+    _version: 1,
+    _ingested_at: "2026-05-02T07:45:30.000Z"
   },
   {
     _type: "Event",
@@ -809,6 +984,31 @@ export const EVENTS: Event[] = [
     },
     _version: 1,
     _ingested_at: "2026-05-02T07:40:00.000Z"
+  },
+  {
+    _type: "Event",
+    _id: "evt_air_strike_001",
+    _source: "sim:silent-eye-20260502",
+    _source_ref: "evt_air_strike_001",
+    _observed_at: "2026-05-02T07:39:30.000Z",
+    _subtype: "air_strike",
+    entity_id: "ent_red_su34",
+    position: [
+      48.65,
+      37.85
+    ],
+    severity: "critical",
+    description: "Su-34 (RED-SU34) drops UMPK-equipped FAB-500M-62 on suspected UA prepared position. Impact 400m south of PUNISHER-1 line; strike inaccurate, no friendly casualties.",
+    verb: "Bombed.",
+    payload: {
+      weapon: "FAB-500M-62",
+      guidance: "UMPK glide kit",
+      cep_m: 120,
+      target_inaccuracy: "true",
+      time_of_flight_s: 35
+    },
+    _version: 1,
+    _ingested_at: "2026-05-02T07:39:30.000Z"
   },
   {
     _type: "Event",
@@ -1032,6 +1232,29 @@ export const EVENTS: Event[] = [
   },
   {
     _type: "Event",
+    _id: "evt_nato_002",
+    _source: "sim:silent-eye-20260502",
+    _source_ref: "evt_nato_002",
+    _observed_at: "2026-05-02T07:01:00.000Z",
+    _subtype: "sigint_intercept",
+    entity_id: "ent_red_orlan_01",
+    position: [
+      48.86,
+      37.7
+    ],
+    severity: "info",
+    description: "NATO RC-135V (JAKE21) standoff SIGINT cross-corroborates ROOK-1 + FALCON-1 detection of Orlan-10. Independent confirmation from 600 km standoff strengthens classification confidence.",
+    verb: "Confirmed.",
+    payload: {
+      channel: "L-band",
+      relay_via: "ent_nato_isr_rc135",
+      corroboration_basis: "second_independent_intercept"
+    },
+    _version: 1,
+    _ingested_at: "2026-05-02T07:01:00.000Z"
+  },
+  {
+    _type: "Event",
     _id: "evt_phase2_003",
     _source: "sim:silent-eye-20260502",
     _source_ref: "evt_phase2_003",
@@ -1229,5 +1452,28 @@ export const EVENTS: Event[] = [
     },
     _version: 1,
     _ingested_at: "2026-05-02T06:40:00.000Z"
+  },
+  {
+    _type: "Event",
+    _id: "evt_nato_001",
+    _source: "feed:opensky",
+    _source_ref: "evt_nato_001",
+    _observed_at: "2026-05-02T06:32:00.000Z",
+    _subtype: "track_acquired",
+    entity_id: "ent_nato_isr_rc135",
+    position: [
+      49.2,
+      24
+    ],
+    severity: "info",
+    description: "OpenSky pickup: RC-135V (JAKE21) on standoff SIGINT loiter over Polish airspace. Confirms NATO collection support to UA forces in eastern axis.",
+    verb: "Tracked.",
+    payload: {
+      sensor: "ads_b",
+      kind: "nato_isr",
+      loiter_radius_km: 40
+    },
+    _version: 1,
+    _ingested_at: "2026-05-02T06:32:00.000Z"
   }
 ];

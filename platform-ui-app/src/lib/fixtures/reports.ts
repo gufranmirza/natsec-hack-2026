@@ -5,6 +5,24 @@ import type { Report } from '@/types/ontology';
 export const REPORTS: Report[] = [
   {
     _type: "Report",
+    _id: "rep_015",
+    _source: "feed:acled",
+    _source_ref: "acled-2026-05-02-uam-bakhmut-001",
+    _observed_at: "2026-05-02T08:30:00.000Z",
+    _subtype: "osint",
+    author: "acled",
+    channel: "acled-conflict-data",
+    text: "ACLED entry (preliminary): event_type=Battles, sub_event_type=Armed clash, location=near Bakhmut. Actor1=Ukrainian Armed Forces, Actor2=Russian Armed Forces. Reported casualties: 1 KIA + 5 WIA UA-side, 12+ KIA RU-side (estimate). Source: synthesized from operator filings. Independent corroboration of our SITREP.",
+    entity_refs: [
+      "ent_red_assault_co_01",
+      "unit_blue_mech_pl1"
+    ],
+    classification: "unclass",
+    _version: 1,
+    _ingested_at: "2026-05-02T08:30:00.000Z"
+  },
+  {
+    _type: "Report",
     _id: "rep_004",
     _source: "sim:silent-eye-20260502",
     _source_ref: "rep_004",
@@ -59,6 +77,23 @@ export const REPORTS: Report[] = [
     classification: "cui",
     _version: 1,
     _ingested_at: "2026-05-02T08:11:00.000Z"
+  },
+  {
+    _type: "Report",
+    _id: "rep_014",
+    _source: "feed:liveuamap",
+    _source_ref: "luam-incident-20260502-37us-c624",
+    _observed_at: "2026-05-02T08:09:00.000Z",
+    _subtype: "osint",
+    author: "liveuamap",
+    channel: "public-incident-feed",
+    text: "Liveuamap incident pin: 'Counter-battery strike near Bakhmut, Russian Tornado-S claimed destroyed by HIMARS, ~3 vehicles confirmed destroyed via geolocated wreckage video.' Pin matches our RED-BAT-7 grid (48.65, 38.03) within 200m. Public confirmation strengthens BDA confidence.",
+    entity_refs: [
+      "ent_red_arty_battery_01"
+    ],
+    classification: "unclass",
+    _version: 1,
+    _ingested_at: "2026-05-02T08:09:00.000Z"
   },
   {
     _type: "Report",
@@ -163,6 +198,23 @@ export const REPORTS: Report[] = [
     classification: "cui",
     _version: 1,
     _ingested_at: "2026-05-02T07:47:30.000Z"
+  },
+  {
+    _type: "Report",
+    _id: "rep_013",
+    _source: "feed:opensky",
+    _source_ref: "rep_013",
+    _observed_at: "2026-05-02T07:38:30.000Z",
+    _subtype: "sigint",
+    author: "OPSKY-XCORR",
+    channel: "ads_b_squawk",
+    text: "OpenSky pickup: ICAO 5141b7 transponder went silent at 07:36Z, 70 km NE of AO. Last known altitude 4500m, southwest heading. Profile consistent with Su-34 strike-sortie egress posture.",
+    entity_refs: [
+      "ent_red_su34"
+    ],
+    classification: "unclass",
+    _version: 1,
+    _ingested_at: "2026-05-02T07:38:30.000Z"
   },
   {
     _type: "Report",
