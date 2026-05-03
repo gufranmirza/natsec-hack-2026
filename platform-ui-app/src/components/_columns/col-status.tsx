@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  AlertTriangle,
   Battery,
   Brain,
   CheckCircle2,
@@ -11,7 +12,9 @@ import {
   Eye,
   FileStack,
   Fuel,
+  Globe,
   Heart,
+  HelpCircle,
   MapPin,
   Network,
   Plane,
@@ -443,30 +446,39 @@ function ObjectsPanel({
     <>
       <Section title="Registry" meta={`${objects.length} live objects`} fill>
         <ul className="divide-border divide-y">
-          {objects.map((object) => (
-            <li key={object._id}>
-              <button
-                type="button"
-                onClick={() => onSelect(object)}
-                className={[
-                  'hover:bg-secondary flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition-colors',
-                  selectedId === object._id ? 'bg-secondary' : '',
-                ].join(' ')}
-              >
-                <div className="min-w-0">
-                  <div className="text-foreground truncate font-mono text-[11px] font-bold">
-                    {objectLabel(object)}
-                  </div>
-                  <div className="text-muted-foreground font-mono text-[10px]">
-                    {object._type} · {object._source}
-                  </div>
-                </div>
-                <span className="border-border text-muted-foreground border px-1.5 py-0.5 font-mono text-[9px]">
-                  v{object._version}
-                </span>
-              </button>
-            </li>
-          ))}
+          {objects.map((object) => {
+            const Icon = registryIcon(object);
+            return (
+              <li key={object._id}>
+                <button
+                  type="button"
+                  onClick={() => onSelect(object)}
+                  className={[
+                    'hover:bg-secondary grid w-full grid-cols-[20px_1fr_auto] items-center gap-2 px-3 py-2 text-left transition-colors',
+                    selectedId === object._id ? 'bg-secondary' : '',
+                  ].join(' ')}
+                >
+                  <span
+                    aria-hidden
+                    className="text-muted-foreground/80 flex size-5 items-center justify-center"
+                  >
+                    <Icon className="size-3.5" strokeWidth={1.8} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="text-foreground block truncate font-mono text-[11px] font-bold">
+                      {objectLabel(object)}
+                    </span>
+                    <span className="text-muted-foreground block truncate font-mono text-[10px]">
+                      {registrySubtitle(object)}
+                    </span>
+                  </span>
+                  <span className="text-muted-foreground/70 shrink-0 font-mono text-[9px]">
+                    {timeShort(object._observed_at)}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
         </ul>
       </Section>
       <Section title="Knowledge graph" meta="entity links">
@@ -1356,4 +1368,95 @@ function objectLabel(object: AnyObject) {
     case 'TaskingOrder':
       return object.command_type;
   }
+}
+
+// registryIcon picks the lucide glyph for a row in the col-status
+// Registry. Only Entity / Unit / Report / Event flow through this
+// surface (see ObjectsPanel.objects), but we cover the rest for safety.
+function registryIcon(object: AnyObject): LucideIcon {
+  switch (object._type) {
+    case 'Unit':
+      return unitIcon(object);
+    case 'Entity':
+      switch (object._subtype) {
+        case 'Aircraft':
+          return Plane;
+        case 'Vehicle':
+          return Truck;
+        case 'Vessel':
+          return Truck;
+        case 'Person':
+          return User;
+        case 'Threat':
+          return AlertTriangle;
+        case 'Unknown':
+          return HelpCircle;
+        default:
+          return Crosshair;
+      }
+    case 'Report':
+      switch (object._subtype) {
+        case 'radio':
+          return Radio;
+        case 'sigint':
+          return Satellite;
+        case 'osint':
+          return Globe;
+        case 'operator':
+          return User;
+        default:
+          return FileStack;
+      }
+    case 'Event':
+      return Zap;
+    case 'Recommendation':
+      return ShieldCheck;
+    case 'MissionObjective':
+      return Crosshair;
+    default:
+      return Database;
+  }
+}
+
+// registrySubtitle — small grey line under the row title. Surfaces the
+// most informative detail per type instead of the producer / version
+// metadata that nobody operationally scans for.
+function registrySubtitle(object: AnyObject): string {
+  switch (object._type) {
+    case 'Entity': {
+      const cls = object.attributes?.class;
+      const role = object.attributes?.role;
+      const detail = cls ?? role;
+      return detail ? `${object._subtype} · ${detail}` : object._subtype;
+    }
+    case 'Unit': {
+      const role = unitTypeLabel(object);
+      const tele =
+        object.battery_pct !== undefined
+          ? `${object.battery_pct}% bat`
+          : object.fuel_pct !== undefined
+            ? `${object.fuel_pct}% fuel`
+            : null;
+      return tele ? `${role} · ${tele}` : role;
+    }
+    case 'Report': {
+      const author = object.author ?? object.channel;
+      return author ? `${object._subtype} · ${author}` : object._subtype;
+    }
+    case 'Event':
+      return `${object._subtype} · ${object.severity}`;
+    case 'Recommendation':
+      return `${object.proposed_action_type} · ${(object.confidence * 100).toFixed(0)}%`;
+    case 'MissionObjective':
+      return `${object.priority} · ${object.status}`;
+    default:
+      return object._type;
+  }
+}
+
+// timeShort — HH:MM:SS slice of an ISO timestamp, mirroring the
+// _time helper in workspace-center. Kept local to avoid a cross-column
+// import.
+function timeShort(iso: string): string {
+  return iso.split('T')[1]?.slice(0, 8) ?? iso;
 }

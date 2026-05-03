@@ -8,7 +8,7 @@
 // Built on shadcn primitives: ScrollArea (Radix), Input, Button, Card.
 
 import { useEffect, useRef, useState } from 'react';
-import { ChevronRight, Mic, Pencil, Send, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Mic, Pencil, Send, X } from 'lucide-react';
 
 import { ObjectChip } from '@/components/_ontology/object-chip';
 import { Button } from '@/components/ui/button';
@@ -53,6 +53,12 @@ interface ColCopilotProps {
   onApprove: (rec: Recommendation) => void;
   onReject: (rec: Recommendation) => void;
   onModify: (rec: Recommendation) => void;
+  /** Send a chat query through the agent (control-plane → Azure OpenAI). */
+  onAskCopilot?: (text: string) => Promise<string | null>;
+  /** Triggered when the user taps the copilot mic — wired to the global voice handler. */
+  onVoiceCommand?: () => void;
+  /** Hint that voice capture is currently armed/listening. */
+  voiceListening?: boolean;
 }
 
 export function ColCopilot({
@@ -61,23 +67,29 @@ export function ColCopilot({
   onApprove,
   onReject,
   onModify,
+  onAskCopilot,
+  onVoiceCommand,
+  voiceListening,
 }: ColCopilotProps) {
   return (
     <aside className="bg-background flex h-full min-h-0 flex-col overflow-hidden">
       {/* TOP 50%: Recommendations */}
-      <section className="border-border flex min-h-0 flex-1 flex-col overflow-hidden border-b">
-        <RecommendationsPanel
-          recommendations={recommendations}
-          onSelect={onSelect}
-          onApprove={onApprove}
-          onReject={onReject}
-          onModify={onModify}
-        />
-      </section>
+      <RecommendationsPanel
+        recommendations={recommendations}
+        onSelect={onSelect}
+        onApprove={onApprove}
+        onReject={onReject}
+        onModify={onModify}
+      />
 
       {/* BOTTOM 50%: Chat / Voice */}
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <ChatPanel onSelect={onSelect} />
+        <ChatPanel
+          onSelect={onSelect}
+          onAsk={onAskCopilot}
+          onMicClick={onVoiceCommand}
+          voiceListening={voiceListening}
+        />
       </section>
     </aside>
   );
@@ -100,38 +112,61 @@ function RecommendationsPanel({
   onReject: (rec: Recommendation) => void;
   onModify: (rec: Recommendation) => void;
 }) {
+  const [open, setOpen] = useState(true);
   const pendingCount = recommendations.filter(
     (rec) => rec.status === 'pending'
   ).length;
   return (
-    <>
-      <header className="border-border bg-muted/30 flex shrink-0 items-baseline justify-between border-b px-3 py-1">
-        <h2 className="text-foreground/90 label-cap">Recommendations</h2>
+    <section
+      className={[
+        'border-border flex flex-col overflow-hidden border-b',
+        open ? 'min-h-0 flex-1' : 'shrink-0',
+      ].join(' ')}
+    >
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls="recommendations-panel"
+        onClick={() => setOpen((v) => !v)}
+        className="border-border bg-muted/30 hover:bg-muted/60 flex w-full shrink-0 items-baseline justify-between border-b px-3 py-1 text-left transition-colors"
+      >
+        <span className="flex items-baseline gap-1.5">
+          <ChevronDown
+            className={[
+              'text-muted-foreground/70 size-3 self-center transition-transform',
+              open ? '' : '-rotate-90',
+            ].join(' ')}
+            aria-hidden
+          />
+          <h2 className="text-foreground/90 label-cap">Recommendations</h2>
+        </span>
         <span className="text-muted-foreground/80 font-mono text-[10px]">
           {pendingCount} pending · grounded
         </span>
-      </header>
+      </button>
 
-      {recommendations.length === 0 ? (
-        <EmptyState message="No recommendations for this mission." />
-      ) : (
-        <ScrollArea className="min-h-0 flex-1">
-          <div className="p-2">
-            {recommendations.map((r, i) => (
-              <RecommendationCard
-                key={r._id}
-                rec={r}
-                active={i === 0}
-                onSelect={onSelect}
-                onApprove={onApprove}
-                onReject={onReject}
-                onModify={onModify}
-              />
-            ))}
-          </div>
-        </ScrollArea>
-      )}
-    </>
+      {open ? (
+        recommendations.length === 0 ? (
+          <EmptyState message="No recommendations for this mission." />
+        ) : (
+          <ScrollArea id="recommendations-panel" className="min-h-0 flex-1">
+            <div className="p-2">
+              {recommendations.map((r, i) => (
+                <RecommendationCard
+                  key={r._id}
+                  rec={r}
+                  active={i === 0}
+                  onSelect={onSelect}
+                  onApprove={onApprove}
+                  onReject={onReject}
+                  onModify={onModify}
+                />
+              ))}
+            </div>
+          </ScrollArea>
+        )
+      ) : null}
+    </section>
   );
 }
 
@@ -306,7 +341,17 @@ function cannedReply(input: string): string {
   return 'Acknowledged. Holding for further input.';
 }
 
-function ChatPanel({ onSelect }: { onSelect: (o: AnyObject) => void }) {
+interface ChatPanelProps {
+  onSelect: (o: AnyObject) => void;
+  /** Send a chat query through the agent (control-plane → Azure OpenAI). Returns the AI's spoken response text. */
+  onAsk?: (text: string) => Promise<string | null>;
+  /** Triggered when the user taps the chat mic — wired to the global voice handler. */
+  onMicClick?: () => void;
+  /** Hint that voice capture is currently armed/listening — flips the mic button visual. */
+  voiceListening?: boolean;
+}
+
+function ChatPanel({ onSelect, onAsk, onMicClick, voiceListening }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>(() => [
     {
       id: 'seed',
@@ -358,7 +403,7 @@ function ChatPanel({ onSelect }: { onSelect: (o: AnyObject) => void }) {
     }
   }, [messages, isThinking]);
 
-  const send = () => {
+  const send = async () => {
     const text = input.trim();
     if (!text || isThinking) return;
     setMessages((m) => [
@@ -367,20 +412,33 @@ function ChatPanel({ onSelect }: { onSelect: (o: AnyObject) => void }) {
     ]);
     setInput('');
     setIsThinking(true);
-    window.setTimeout(() => {
-      const replyText = cannedReply(text);
-      setMessages((m) => [
-        ...m,
-        {
-          id: uid(),
-          role: 'assistant',
-          ts: nowHMS(),
-          meta: 'grounded · canned',
-          body: withChips(replyText, onSelect),
-        },
-      ]);
-      setIsThinking(false);
-    }, 650);
+
+    let replyText: string | null = null;
+    let meta = 'grounded · azure-openai';
+    try {
+      if (onAsk) {
+        replyText = await onAsk(text);
+      }
+    } catch {
+      replyText = null;
+    }
+    if (!replyText) {
+      // Server unreachable / agent disabled — keep the demo flowing
+      // with a minimal fallback that's clearly labeled.
+      replyText = cannedReply(text);
+      meta = 'grounded · canned (control plane offline)';
+    }
+    setMessages((m) => [
+      ...m,
+      {
+        id: uid(),
+        role: 'assistant',
+        ts: nowHMS(),
+        meta,
+        body: withChips(replyText, onSelect),
+      },
+    ]);
+    setIsThinking(false);
   };
 
   return (
@@ -415,6 +473,8 @@ function ChatPanel({ onSelect }: { onSelect: (o: AnyObject) => void }) {
         onChange={setInput}
         onSend={send}
         disabled={isThinking}
+        onMicClick={onMicClick}
+        voiceListening={voiceListening}
       />
     </>
   );
@@ -499,11 +559,15 @@ function ChatInputBar({
   onChange,
   onSend,
   disabled,
+  onMicClick,
+  voiceListening,
 }: {
   value: string;
   onChange: (v: string) => void;
   onSend: () => void;
   disabled: boolean;
+  onMicClick?: () => void;
+  voiceListening?: boolean;
 }) {
   return (
     <div className="border-border bg-muted/20 shrink-0 border-t">
@@ -538,8 +602,11 @@ function ChatInputBar({
         <Button
           type="button"
           aria-label="Push to talk"
-          className="mic-breath"
+          aria-pressed={voiceListening ? true : undefined}
+          className={`mic-breath ${voiceListening ? 'bg-warning text-background' : ''}`}
           size="icon"
+          onClick={onMicClick}
+          disabled={!onMicClick}
         >
           <Mic className="size-3.5" strokeWidth={2.2} />
         </Button>

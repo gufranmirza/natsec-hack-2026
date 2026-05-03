@@ -37,6 +37,12 @@ interface WorkspaceContextRailProps {
   onApprove: (rec: Recommendation) => void;
   onReject: (rec: Recommendation) => void;
   onModify: (rec: Recommendation) => void;
+  /** Forward chat queries through the agent (control-plane → Azure OpenAI). */
+  onAskCopilot?: (text: string) => Promise<string | null>;
+  /** Forward to the global voice handler when the copilot mic is tapped. */
+  onVoiceCommand?: () => void;
+  /** Hint that voice capture is currently armed/listening. */
+  voiceListening?: boolean;
 }
 
 export function WorkspaceContextRail({
@@ -52,6 +58,9 @@ export function WorkspaceContextRail({
   onApprove,
   onReject,
   onModify,
+  onAskCopilot,
+  onVoiceCommand,
+  voiceListening,
 }: WorkspaceContextRailProps) {
   if (workspace === 'awareness') {
     return (
@@ -61,6 +70,9 @@ export function WorkspaceContextRail({
         onApprove={onApprove}
         onReject={onReject}
         onModify={onModify}
+        onAskCopilot={onAskCopilot}
+        onVoiceCommand={onVoiceCommand}
+        voiceListening={voiceListening}
       />
     );
   }
@@ -183,28 +195,75 @@ export function WorkspaceContextRail({
     );
   }
 
+  // Live counts for the right-rail model-inputs panel.
+  const droneCount = units.filter((u) => u._subtype === 'drone').length;
+  const onStationCount = units.filter(
+    (u) => u._subtype === 'drone' && u.status === 'on_station'
+  ).length;
+  const reportSubtypes = new Set(reports.map((r) => r._subtype).filter(Boolean));
+  const reportSummary =
+    reports.length === 0
+      ? 'no reports yet'
+      : `${reports.length} · ${Array.from(reportSubtypes).slice(0, 3).join(' / ') || 'mixed'}`;
+  const trackedEntities = entities.length;
+  const pendingRecCount = recommendations.filter((r) => r.status === 'pending').length;
+  const decidedRecCount = recommendations.filter(
+    (r) => r.status === 'accepted' || r.status === 'rejected'
+  ).length;
+
+  // Suggested voice prompts adapt to current state. Pending decisions get
+  // priority; otherwise nudge the operator toward a useful query.
+  const suggestedPrompts: Array<{ icon: typeof Radio; text: string }> = [];
+  if (pendingRecCount > 0) {
+    suggestedPrompts.push({
+      icon: ShieldCheck,
+      text: `Why is the top recommendation pending?`,
+    });
+  }
+  const hostiles = entities.filter(
+    (e) => e.threat_level === 'high' || e.threat_level === 'med'
+  );
+  if (hostiles[0]) {
+    const name = hostiles[0].name ?? hostiles[0]._subtype;
+    suggestedPrompts.push({ icon: Radio, text: `Show me everything about ${name}` });
+  }
+  suggestedPrompts.push({
+    icon: Plane,
+    text: 'Give me an update on the last 10 minutes',
+  });
+
   return (
     <ContextShell icon={Brain} title="AI context" meta="mission RAG">
       <MetricGrid
         metrics={[
           ['Objects', entities.length + units.length],
           ['Evidence', reports.length + events.length],
-          ['Actions', recommendations.length],
+          ['Pending', pendingRecCount],
         ]}
       />
-      <Panel title="Model inputs" meta="indexed">
-        <StatusRow label="Telemetry" value="unit positions + battery" />
-        <StatusRow label="Reports" value="radio / intel / OSINT" />
-        <StatusRow label="Map" value="DeepState + route context" />
-        <StatusRow label="Audit" value="events + approvals" />
-      </Panel>
-      <Panel title="Voice commands" meta="examples">
-        <PromptLine
-          icon={Radio}
-          text="Give me an update on the last 10 minutes"
+      <Panel title="Model inputs" meta="indexed live">
+        <StatusRow
+          label="Telemetry"
+          value={`${droneCount} drones · ${onStationCount} on-station`}
         />
-        <PromptLine icon={Plane} text="Launch ROOK-1 to investigate" />
-        <PromptLine icon={ShieldCheck} text="What evidence supports this?" />
+        <StatusRow label="Reports" value={reportSummary} />
+        <StatusRow
+          label="Tracks"
+          value={
+            trackedEntities === 0
+              ? 'none'
+              : `${trackedEntities} entities · ${hostiles.length} contested`
+          }
+        />
+        <StatusRow
+          label="Audit"
+          value={`${events.length} events · ${decidedRecCount} decisions`}
+        />
+      </Panel>
+      <Panel title="Suggested queries" meta="context-aware">
+        {suggestedPrompts.slice(0, 3).map((p) => (
+          <PromptLine key={p.text} icon={p.icon} text={p.text} />
+        ))}
       </Panel>
     </ContextShell>
   );
