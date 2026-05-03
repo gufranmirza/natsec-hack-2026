@@ -176,8 +176,17 @@ function RecommendationCard({
 
   return (
     <Card
+      role="button"
+      tabIndex={0}
+      onClick={() => onSelect(rec)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect(rec);
+        }
+      }}
       className={[
-        'hover:border-primary/60 mb-2 px-2.5 py-2.5 transition-colors last:mb-0',
+        'hover:border-primary/60 mb-2 cursor-pointer px-2.5 py-2.5 text-left transition-colors last:mb-0',
         active && rec.status === 'pending' ? 'brackets relative' : '',
         rec.status === 'accepted' ? 'border-success/70 bg-success/5' : '',
         rec.status === 'rejected' ? 'opacity-55' : '',
@@ -241,7 +250,10 @@ function RecommendationCard({
             {rec.status === 'pending' ? rec.gating : rec.status}
           </span>
         </div>
-        <div className="flex items-center gap-1">
+        <div
+          className="flex items-center gap-1"
+          onClick={(e) => e.stopPropagation()}
+        >
           <Button
             variant="ghost"
             size="icon"

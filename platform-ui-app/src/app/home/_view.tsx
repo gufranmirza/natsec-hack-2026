@@ -1176,6 +1176,9 @@ export function HomeView() {
         object={selected}
         onClose={() => setDrawerOpen(false)}
         onSelect={handleSelect}
+        onApprove={handleApproveRecommendation}
+        onReject={handleRejectRecommendation}
+        onModify={handleModifyRecommendation}
       />
     </div>
   );

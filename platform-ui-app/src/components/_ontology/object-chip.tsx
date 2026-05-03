@@ -72,7 +72,13 @@ export function ObjectChip({
   const stripe = typeStripeColor(o._type);
   const name = label ?? displayName(o);
 
-  const handleClick = () => onSelect?.(o);
+  // stopPropagation so a chip click inside a clickable parent (e.g. a
+  // recommendation card) doesn't bubble up and overwrite the selection
+  // with the parent's object.
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onSelect?.(o);
+  };
 
   return (
     <button

@@ -7,11 +7,14 @@
 //
 // Per UI ADR 0001 R-9.
 
+import { ChevronRight, Pencil, X } from 'lucide-react';
+
 import {
   affiliationToken,
   typeStripeColor,
 } from '@/components/_ontology/affiliation';
 import { ObjectChip } from '@/components/_ontology/object-chip';
+import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { displayName } from '@/lib/fixtures';
 import type {
@@ -28,6 +31,9 @@ interface ObjectDrawerProps {
   object: AnyObject | null;
   onClose: () => void;
   onSelect?: (o: AnyObject) => void;
+  onApprove?: (rec: Recommendation) => void;
+  onReject?: (rec: Recommendation) => void;
+  onModify?: (rec: Recommendation) => void;
 }
 
 export function ObjectDrawer({
@@ -35,6 +41,9 @@ export function ObjectDrawer({
   object,
   onClose,
   onSelect,
+  onApprove,
+  onReject,
+  onModify,
 }: ObjectDrawerProps) {
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
@@ -42,7 +51,15 @@ export function ObjectDrawer({
         side="right"
         className="border-border bg-background w-[420px] max-w-[420px] overflow-y-auto p-0 sm:max-w-[420px]"
       >
-        {object ? <DrawerBody object={object} onSelect={onSelect} /> : null}
+        {object ? (
+          <DrawerBody
+            object={object}
+            onSelect={onSelect}
+            onApprove={onApprove}
+            onReject={onReject}
+            onModify={onModify}
+          />
+        ) : null}
       </SheetContent>
     </Sheet>
   );
@@ -51,9 +68,15 @@ export function ObjectDrawer({
 function DrawerBody({
   object,
   onSelect,
+  onApprove,
+  onReject,
+  onModify,
 }: {
   object: AnyObject;
   onSelect?: (o: AnyObject) => void;
+  onApprove?: (rec: Recommendation) => void;
+  onReject?: (rec: Recommendation) => void;
+  onModify?: (rec: Recommendation) => void;
 }) {
   const stripe = typeStripeColor(object._type);
   const name = displayName(object);
@@ -84,7 +107,13 @@ function DrawerBody({
         {object._type === 'Unit' && <UnitBody object={object} />}
         {object._type === 'Report' && <ReportBody object={object} />}
         {object._type === 'Recommendation' && (
-          <RecommendationBody object={object} onSelect={onSelect} />
+          <RecommendationBody
+            object={object}
+            onSelect={onSelect}
+            onApprove={onApprove}
+            onReject={onReject}
+            onModify={onModify}
+          />
         )}
         {object._type === 'MissionObjective' && (
           <MissionObjectiveBody object={object} />
@@ -291,10 +320,18 @@ function ReportBody({ object }: { object: Report }) {
 function RecommendationBody({
   object,
   onSelect,
+  onApprove,
+  onReject,
+  onModify,
 }: {
   object: Recommendation;
   onSelect?: (o: AnyObject) => void;
+  onApprove?: (rec: Recommendation) => void;
+  onReject?: (rec: Recommendation) => void;
+  onModify?: (rec: Recommendation) => void;
 }) {
+  const decided =
+    object.status === 'accepted' || object.status === 'rejected';
   return (
     <div className="space-y-4">
       <p className="text-foreground/95 text-[14px] leading-snug">
@@ -303,6 +340,48 @@ function RecommendationBody({
         </span>
         {object.short}
       </p>
+
+      {/* Action row — same buttons as the card so the operator can decide
+          straight from the detail panel. Hidden if no handlers wired. */}
+      {onApprove || onReject || onModify ? (
+        <div className="border-border flex items-center gap-1.5 border-y py-2">
+          {onReject ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={decided}
+              onClick={() => onReject(object)}
+              className="text-threat hover:bg-threat/10 hover:text-threat"
+            >
+              <X className="size-3.5" />
+              Reject
+            </Button>
+          ) : null}
+          {onModify ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={decided}
+              onClick={() => onModify(object)}
+            >
+              <Pencil className="size-3.5" />
+              Modify
+            </Button>
+          ) : null}
+          {onApprove ? (
+            <Button
+              size="sm"
+              disabled={decided}
+              onClick={() => onApprove(object)}
+              className="ml-auto"
+            >
+              {object.status === 'accepted' ? 'Approved' : 'Approve'}
+              <ChevronRight className="size-3.5" />
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-2 gap-x-4 gap-y-3">
         <Stat
           label="Confidence"

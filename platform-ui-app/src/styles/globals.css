@@ -21,8 +21,8 @@
 
 @layer base {
   :root {
-    /* — Surface scale (neutral grey) ————————————————————— */
-    --background: 220 14% 96%;
+    /* — Surface scale (pure white shell) ————————————————— */
+    --background: 0 0% 100%;
     --foreground: 222 24% 10%;
     --card: 0 0% 100%;
     --card-foreground: 222 24% 10%;
@@ -63,8 +63,8 @@
     /* — Geometry: SHARP. No rounded corners on operational chrome. */
     --radius: 0px;
 
-    /* — Sidebar — slightly cooler/darker than canvas ————— */
-    --sidebar-background: 220 12% 94%;
+    /* — Sidebar — match the white shell ————————————————— */
+    --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 222 18% 28%;
     --sidebar-primary: 24 66% 43%;
     --sidebar-primary-foreground: 0 0% 100%;
