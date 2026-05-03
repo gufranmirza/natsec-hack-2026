@@ -67,13 +67,50 @@ export interface Entity extends OntologyEnvelope {
 // Event (ADR 0002 §5.2)
 // ──────────────────────────────────────────────────────────────────
 
+// Subtypes are grouped by category; all are wire-compatible since
+// control-plane ADR 0002 §5.2 accepts free-form `_subtype` strings.
+// New values added per UI ADR 0002 §12 (OP SILENT EYE scenario).
 export type EventSubtype =
+  // legacy / generic
   | 'detection'
   | 'deviation'
   | 'rf_ping'
   | 'ais_gap'
   | 'anomaly'
-  | 'report_link';
+  | 'report_link'
+  // ISR
+  | 'visual_detection'
+  | 'cued_search'
+  | 'track_acquired'
+  | 'track_lost'
+  | 'regained_track'
+  | 'classification_upgrade'
+  // C2 / comms
+  | 'sigint_intercept'
+  | 'comms_outage'
+  | 'jam_pulse'
+  | 'gps_denied_zone'
+  | 'position_report'
+  // kinetic
+  | 'artillery_impact'
+  | 'missile_launch'
+  | 'fpv_strike'
+  | 'loitering_munition_engage'
+  | 'small_arms_contact'
+  // maneuver
+  | 'ground_advance'
+  | 'withdrawal'
+  | 'breach_attempt'
+  | 'defensive_consolidation'
+  | 'smoke_screen'
+  | 'terrain_obscuration'
+  // logistics & lifecycle
+  | 'casevac_request'
+  | 'medevac_dispatched'
+  | 'unit_destroyed'
+  | 'unit_damaged'
+  // OSINT
+  | 'geotagged_social_post';
 
 export type EventSeverity = 'info' | 'warn' | 'critical';
 
