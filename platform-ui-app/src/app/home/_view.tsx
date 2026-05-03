@@ -149,6 +149,11 @@ const FALLBACK_MISSION: MissionObjective = {
   status: 'open',
 };
 
+// Module-scope guard so the unknown-contact scenario fires exactly
+// once per browser session (across React StrictMode's double-mount
+// in dev, and across HomeView re-renders). Reset only by reload.
+let scenarioStartedThisSession = false;
+
 export function HomeView() {
   // useDemoData branches on NEXT_PUBLIC_USE_LIVE_CP: live=false returns
   // the static fixtures; live=true polls the cp/* TanStack Query hooks.
@@ -275,14 +280,17 @@ export function HomeView() {
     return () => window.clearInterval(id);
   }, [seed.live]);
 
-  // unknown-contact scenario — fires once per session ~10s after the
-  // first units poll completes. Walks ROOK-1 (or the first camera-
-  // equipped drone) to a fixed target near the AO, persisting every
-  // milestone to CP so the agent can later answer SITREP questions.
-  const scenarioStartedRef = useRef(false);
+  // unknown-contact scenario — fires once per browser session ~10s
+  // after the first units poll completes. Walks ROOK-1 (or the first
+  // camera-equipped drone) to a fixed target near the AO, persisting
+  // every milestone to CP so the agent can later answer SITREP
+  // questions. The "once per session" guard lives in a module-scope
+  // flag (scenarioStartedThisSession below) so React StrictMode's
+  // mount → unmount → mount doesn't cancel the timer + leave the
+  // scenario unstarted.
   const scenarioHandleRef = useRef<ScenarioHandle | null>(null);
   useEffect(() => {
-    if (scenarioStartedRef.current) return;
+    if (scenarioStartedThisSession) return;
     if (units.length === 0) return;
     const camDrone =
       units.find((u) => u._id === 'unit_rook1') ??
@@ -296,7 +304,7 @@ export function HomeView() {
           )
       );
     if (!camDrone) return;
-    scenarioStartedRef.current = true;
+    scenarioStartedThisSession = true;
     const timer = window.setTimeout(() => {
       scenarioHandleRef.current = startUnknownContactScenario({
         drone: camDrone,
@@ -312,13 +320,17 @@ export function HomeView() {
           setEvents,
           setReports,
           setRecommendations,
+          setActiveDroneFeed,
         },
       });
     }, 10_000);
     return () => {
       window.clearTimeout(timer);
-      scenarioHandleRef.current?.abort();
-      scenarioHandleRef.current = null;
+      // Don't abort the scenario on cleanup. StrictMode runs the
+      // effect twice in dev (mount → unmount → mount) and we'd
+      // tear down a perfectly good scenario. The scenario's CP
+      // writes are durable and its in-memory timers run inside the
+      // closure, so it survives this component's re-render cycle.
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [units.length > 0]);

@@ -38,8 +38,13 @@ import type {
   Unit,
 } from '@/types/ontology';
 
-const TICK_MS = 1500;
-const TRANSIT_DURATION_MS = 30_000;
+const TICK_MS = 1000;
+// Total transit budget (ms). Tuned to keep the whole demo (10s
+// pre-trigger delay + detect/recommend + operator decision +
+// transit + analyze) under ~60s on a typical operator approval
+// rhythm — long enough for the camera follow to read as motion,
+// short enough not to feel laggy.
+const TRANSIT_DURATION_MS = 22_000;
 const ARRIVAL_RADIUS_M = 180;
 const SOURCE = 'scenario:unknown-contact';
 
@@ -49,6 +54,13 @@ export interface ScenarioHooks {
   setEvents: React.Dispatch<React.SetStateAction<Event[]>>;
   setReports: React.Dispatch<React.SetStateAction<Report[]>>;
   setRecommendations: React.Dispatch<React.SetStateAction<Recommendation[]>>;
+  /**
+   * Optional — when set, the scenario flips the UAS tab's active
+   * camera feed to the dispatched drone the moment transit starts so
+   * the operator can pop over to UAS and see the camera follow the
+   * drone in to the target.
+   */
+  setActiveDroneFeed?: React.Dispatch<React.SetStateAction<string | undefined>>;
 }
 
 export interface ScenarioConfig {
@@ -327,6 +339,7 @@ export function startUnknownContactScenario(
     if (aborted) return;
     setPhase('transit');
     transitStartedAt.value = Date.now();
+    cfg.hooks.setActiveDroneFeed?.(cfg.drone._id);
     transitTimer = setInterval(transitTick, TICK_MS);
     // Fire one tick immediately so the drone starts moving without
     // waiting TICK_MS for the first interval frame.

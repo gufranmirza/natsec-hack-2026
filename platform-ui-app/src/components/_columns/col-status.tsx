@@ -309,7 +309,15 @@ function DroneOpsPanel({
   onLaunchDrone: (unitId: string) => void;
   onLaunchSwarm: () => void;
 }) {
-  const drones = units.filter((unit) => unit._subtype === 'drone');
+  // Match all drone subtypes — drone (legacy), drone_isr, drone_strike.
+  // The CP wire returns ROOK-1 as `drone_isr`; the legacy-only filter
+  // dropped it from the col-status fleet list.
+  const drones = units.filter(
+    (unit) =>
+      unit._subtype === 'drone' ||
+      unit._subtype === 'drone_isr' ||
+      unit._subtype === 'drone_strike'
+  );
 
   return (
     <>
@@ -634,7 +642,7 @@ function IntelligencePanel({
       </Section>
       <Section
         title="Current assessment"
-        meta={`${units.filter((u) => u._subtype === 'drone').length} drones · ${entities.length} tracks`}
+        meta={`${units.filter((u) => u._subtype === 'drone' || u._subtype === 'drone_isr' || u._subtype === 'drone_strike').length} drones · ${entities.length} tracks`}
       >
         <div className="grid gap-2 p-3">
           <Insight title="Most likely" value={mostLikely} />
