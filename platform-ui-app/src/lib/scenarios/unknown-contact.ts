@@ -85,6 +85,8 @@ export function startUnknownContactScenario(
   cfg: ScenarioConfig,
 ): ScenarioHandle {
   const nonce = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const contactName =
+    cfg.contactName ?? `UNK-${nonce.slice(-4).toUpperCase()}`;
   const entityId = `ent_unknown_${nonce}`;
   const recId = `rec_vector_isr_${nonce}`;
   const detectionEventId = `evt_visual_detection_${nonce}`;
@@ -126,7 +128,7 @@ export function startUnknownContactScenario(
       _ingested_at: observedAt,
       _subtype: 'Unknown',
       affiliation: 'unknown',
-      name: cfg.contactName ?? `UNK-${nonce.slice(-4).toUpperCase()}`,
+      name: contactName,
       position: cfg.target,
       heading_deg: 90,
       speed_mps: 0,
@@ -150,9 +152,9 @@ export function startUnknownContactScenario(
       severity: 'warn',
       entity_id: entityId,
       position: cfg.target,
-      description: `New unresolved contact detected near ${cfg.target[0].toFixed(3)}°N ${cfg.target[1].toFixed(3)}°E. Multi-source cue (FALCON-1 EO + SIG-A RF). Awaiting drone ISR confirmation.`,
+      description: `New unresolved contact ${contactName} detected near ${cfg.target[0].toFixed(3)}°N ${cfg.target[1].toFixed(3)}°E. Multi-source cue (FALCON-1 EO + SIG-A RF). Awaiting drone ISR confirmation.`,
       verb: 'Detected.',
-      payload: { scenario: 'unknown-contact', nonce },
+      payload: { scenario: 'unknown-contact', nonce, contact: contactName },
     };
     const sigintReport: Report = {
       _type: 'Report',
@@ -208,7 +210,7 @@ export function startUnknownContactScenario(
       _ingested_at: observedAt,
       proposed_action_type: 'vector_isr',
       proposed_params: proposedParams,
-      rationale: `Unknown contact ${entityId} at ${cfg.target[0].toFixed(3)}°N ${cfg.target[1].toFixed(3)}°E corroborated by RF + EO. ${cfg.drone.callsign} is closest camera-equipped asset and within fuel envelope; vector for visual ID before threat assessment.`,
+      rationale: `Unknown contact ${contactName} at ${cfg.target[0].toFixed(3)}°N ${cfg.target[1].toFixed(3)}°E corroborated by RF + EO. ${cfg.drone.callsign} is closest camera-equipped asset and within fuel envelope; vector for visual ID before threat assessment.`,
       confidence: 0.83,
       evidence_refs: [detectionEventId, sigintReportId],
       status: 'pending',
@@ -217,7 +219,7 @@ export function startUnknownContactScenario(
       // card immediately so we don't have to wait for the read-side
       // normalizer to fill them in.
       verb: 'Vector',
-      short: `${cfg.drone.callsign} → unknown contact`,
+      short: `${cfg.drone.callsign} → ${contactName}`,
       gating: 'confirm',
       why: [
         'multi-source RF + EO',
@@ -269,7 +271,7 @@ export function startUnknownContactScenario(
       severity: 'info',
       entity_id: entityId,
       unit_id: cfg.drone._id,
-      description: `Operator approved vector_isr: ${cfg.drone.callsign} dispatched to investigate unknown contact ${entityId}.`,
+      description: `Operator approved vector_isr: ${cfg.drone.callsign} dispatched to investigate unknown contact ${contactName}.`,
       verb: 'Approved.',
       payload: {
         recommendation_id: recId,
@@ -387,7 +389,7 @@ export function startUnknownContactScenario(
       _ingested_at: observedAt,
       _subtype: 'Vehicle',
       affiliation: 'hostile',
-      name: cfg.contactName ?? `UNK-${nonce.slice(-4).toUpperCase()}`,
+      name: contactName,
       position: cfg.target,
       heading_deg: 90,
       speed_mps: 0,
@@ -415,7 +417,7 @@ export function startUnknownContactScenario(
       entity_id: entityId,
       unit_id: cfg.drone._id,
       position: cfg.target,
-      description: `${cfg.drone.callsign} EO acquires hard track on contact ${entityId}. Confidence 0.86.`,
+      description: `${cfg.drone.callsign} EO acquires hard track on contact ${contactName}. Confidence 0.86.`,
       verb: 'Acquired.',
       payload: { scenario: 'unknown-contact', nonce },
     };
@@ -432,7 +434,7 @@ export function startUnknownContactScenario(
       entity_id: entityId,
       unit_id: cfg.drone._id,
       position: cfg.target,
-      description: `Fusion: EO confirms tracked-vehicle hull + thermal signature + RF cue match → hostile motorized. Reclassify Unknown → Vehicle, hostile, threat_level=med.`,
+      description: `Fusion: EO confirms tracked-vehicle hull + thermal signature + RF cue match → hostile motorized. Contact ${contactName} reclassified Unknown → Vehicle, hostile, threat_level=med.`,
       verb: 'Reclassified.',
       payload: {
         scenario: 'unknown-contact',
