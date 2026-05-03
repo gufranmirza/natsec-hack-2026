@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import deepStateOccupied from '@/lib/fixtures/deepstate-occupied-20260502.json';
 import type { AnyObject, Entity, LatLon, Unit } from '@/types/ontology';
@@ -94,8 +94,37 @@ const MARKER_OFFSETS: Record<string, { x: number; y: number }> = {
 
 export function ColMap({ entities, units, selectedId, onSelect }: ColMapProps) {
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
+  const [keplerStats, setKeplerStats] = useState({
+    rows: 0,
+    fields: 0,
+    status: 'loading' as 'loading' | 'ready' | 'failed',
+  });
   const tiles = useMemo(() => buildTiles(zoom), [zoom]);
   const occupiedPaths = useMemo(() => buildDeepStatePaths(), []);
+
+  useEffect(() => {
+    let active = true;
+
+    void import('@kepler.gl/processors/dist/data-processor')
+      .then(({ processGeojson }) => {
+        const dataset = processGeojson(deepStateOccupied);
+        if (!active) return;
+        setKeplerStats({
+          rows: dataset?.rows.length ?? 0,
+          fields: dataset?.fields.length ?? 0,
+          status: 'ready',
+        });
+      })
+      .catch(() => {
+        if (active) {
+          setKeplerStats((current) => ({ ...current, status: 'failed' }));
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <section className="relative h-full overflow-hidden bg-[hsl(220_12%_84%)]">
@@ -133,6 +162,7 @@ export function ColMap({ entities, units, selectedId, onSelect }: ColMapProps) {
           <span className="text-success font-mono text-[10px]">local</span>
         </div>
         <div className="grid gap-1 font-mono text-[10px]">
+          <LayerRow label="Kepler.gl processor" tone="friendly" />
           <LayerRow label="DeepState GeoJSON" tone="threat" />
           <LayerRow label="CARTO English tiles" tone="muted" />
           <LayerRow label="OSINT geotag cue" tone="warning" />
@@ -145,6 +175,11 @@ export function ColMap({ entities, units, selectedId, onSelect }: ColMapProps) {
         <div className="label-cap-sm text-muted-foreground">Dataset</div>
         <div className="text-muted-foreground mt-0.5 truncate font-mono text-[9px]">
           {DEEPSTATE_NAME} · latest daily fixture
+        </div>
+        <div className="border-border text-muted-foreground mt-1.5 flex gap-3 border-t pt-1.5 font-mono text-[9px]">
+          <span>kepler {keplerStats.status}</span>
+          <span>rows {keplerStats.rows}</span>
+          <span>fields {keplerStats.fields}</span>
         </div>
       </div>
 
