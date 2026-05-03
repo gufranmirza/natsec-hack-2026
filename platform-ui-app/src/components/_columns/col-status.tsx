@@ -5,12 +5,14 @@ import {
   Brain,
   CheckCircle2,
   ChevronDown,
+  Clock,
   Crosshair,
   Database,
   Eye,
   FileStack,
   Fuel,
   Heart,
+  MapPin,
   Network,
   Plane,
   PlaneTakeoff,
@@ -724,27 +726,107 @@ function ObjectiveBanner({
   objective: MissionObjective;
   onSelect: (o: AnyObject) => void;
 }) {
+  const priorityTone =
+    objective.priority === 'P0'
+      ? 'border-threat/50 text-threat'
+      : objective.priority === 'P1'
+        ? 'border-warning/50 text-warning'
+        : 'border-muted-foreground/40 text-muted-foreground';
+
+  const statusTone =
+    objective.status === 'active'
+      ? 'border-success/40 text-success/90'
+      : objective.status === 'open'
+        ? 'border-primary/40 text-primary/90'
+        : objective.status === 'completed'
+          ? 'border-muted-foreground/30 text-muted-foreground/80'
+          : 'border-threat/40 text-threat/80';
+
+  const deadlineHHMM = objective.deadline?.split('T')[1]?.slice(0, 5);
+  const remaining = deadlineRemaining(objective.deadline);
+  const aoSize = objective.target_area?.length
+    ? `AO ${objective.target_area.length - 1}-pt polygon`
+    : null;
+
   return (
     <button
       type="button"
       onClick={() => onSelect(objective)}
       className="border-border bg-card hover:bg-secondary group flex w-full shrink-0 flex-col items-start gap-1 border-b px-3 py-2 text-left transition-colors"
     >
-      <div className="flex w-full items-baseline justify-between">
-        <span className="text-muted-foreground label-cap-sm">Objective</span>
-        <span className="text-primary font-mono text-[10px]">
+      {/* row 1 — label + priority pill */}
+      <div className="flex w-full items-center justify-between">
+        <div className="text-muted-foreground inline-flex items-center gap-1">
+          <Crosshair aria-hidden className="size-3" strokeWidth={2} />
+          <span className="label-cap-sm">Objective</span>
+        </div>
+        <span
+          className={`rounded-sm border px-1 py-px font-mono text-[9px] uppercase tracking-wide ${priorityTone}`}
+        >
           {objective.priority}
         </span>
       </div>
-      <span className="text-foreground font-serif text-[15px] italic leading-tight tracking-tight">
-        {objective.title}
-      </span>
-      <span className="text-muted-foreground font-mono text-[10px]">
-        {objective.status.toUpperCase()} · DUE&nbsp;
-        {objective.deadline?.split('T')[1]?.slice(0, 5)}Z
-      </span>
+
+      {/* row 2 — title + status pill */}
+      <div className="flex w-full items-baseline justify-between gap-2">
+        <span className="text-foreground truncate font-serif text-[15px] italic leading-tight tracking-tight">
+          {objective.title}
+        </span>
+        <span
+          className={`shrink-0 rounded-sm border px-1 py-px font-mono text-[9px] uppercase tracking-wide ${statusTone}`}
+        >
+          {objective.status}
+        </span>
+      </div>
+
+      {/* row 3 — description (truncated) */}
+      {objective.description ? (
+        <p className="text-muted-foreground/85 line-clamp-2 text-[11px] leading-snug">
+          {objective.description}
+        </p>
+      ) : null}
+
+      {/* row 4 — footer: deadline + countdown + AO size */}
+      {(deadlineHHMM || aoSize) && (
+        <div className="text-muted-foreground/80 flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-[10px]">
+          {deadlineHHMM ? (
+            <span className="inline-flex items-center gap-0.5">
+              <Clock aria-hidden className="size-2.5" strokeWidth={2} />
+              due {deadlineHHMM}Z
+              {remaining ? (
+                <span className="text-muted-foreground/60">
+                  &nbsp;· {remaining}
+                </span>
+              ) : null}
+            </span>
+          ) : null}
+          {aoSize ? (
+            <>
+              <span aria-hidden className="text-muted-foreground/40">·</span>
+              <span className="inline-flex items-center gap-0.5">
+                <MapPin aria-hidden className="size-2.5" strokeWidth={2} />
+                {aoSize}
+              </span>
+            </>
+          ) : null}
+        </div>
+      )}
     </button>
   );
+}
+
+// deadlineRemaining renders "Hh Mm" between now and the deadline, or
+// "overdue" when past, or "" when missing.
+function deadlineRemaining(deadlineISO: string | undefined): string {
+  if (!deadlineISO) return '';
+  const ms = Date.parse(deadlineISO) - Date.now();
+  if (Number.isNaN(ms)) return '';
+  if (ms < 0) return 'overdue';
+  const totalMin = Math.floor(ms / 60_000);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h === 0) return `${m}m left`;
+  return `${h}h ${m}m left`;
 }
 
 function UnitRow({
